@@ -18,12 +18,18 @@ class SheetsDB:
             if os.path.exists("credenciales_gcp.json"):
                 creds = ServiceAccountCredentials.from_json_keyfile_name("credenciales_gcp.json", self.scope)
                 self.client = gspread.authorize(creds)
-            # Opción 2: Streamlit Cloud Secrets (Producción)
+            # Opción 2: Streamlit Cloud Secrets (Formato JSON en crudo)
+            elif "gcp_json" in st.secrets:
+                import json
+                creds_dict = json.loads(st.secrets["gcp_json"])
+                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+                self.client = gspread.authorize(creds)
+            # Opción 3: Streamlit Cloud Secrets (Formato Diccionario TOML)
             elif "gcp_service_account" in st.secrets:
                 creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], self.scope)
                 self.client = gspread.authorize(creds)
             else:
-                 st.error("No se encontraron 'credenciales_gcp.json' ni secrets.")
+                 st.error("⚠️ Falta configurar credenciales_gcp.json o las llaves de st.secrets.")
         except Exception as e:
             st.error(f"Error conectando a Google Sheets: {e}")
 
