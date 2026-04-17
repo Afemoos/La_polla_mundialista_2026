@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
+import { getUserBetsQuery } from '../services/firestore';
+import type { Prediction } from '../types/firestore';
 import { Clock } from 'lucide-react';
 
 export default function MisApuestas() {
     const { currentUser } = useAuth() || {};
-    const [bets, setBets] = useState<any[]>([]);
+    const [bets, setBets] = useState<Prediction[]>([]);
 
     useEffect(() => {
         if (!currentUser?.email) return;
 
-        const q = query(
-            collection(db, "predictions"),
-            where("email", "==", currentUser.email)
-            // No usamos orderBy aún para evitar requerir crear índices manuales en Firestore inmediatamente
-        );
+        const q = getUserBetsQuery(currentUser.email);
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const betsArray: any[] = [];
+            const betsArray: Prediction[] = [];
             querySnapshot.forEach((doc) => {
-                betsArray.push({ id: doc.id, ...doc.data() });
+                betsArray.push({ id: doc.id, ...doc.data() } as Prediction);
             });
-            // Opcional: ordenar en frontend para mayor velocidad inicial sin index
-            betsArray.sort((a,b) => b.timestamp?.toMillis() - a.timestamp?.toMillis());
             setBets(betsArray);
         });
 

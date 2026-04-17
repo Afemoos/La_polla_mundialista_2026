@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email in [
+        'afemos027@gmail.com',
+        'afemos023@gmail.com'
+      ];
+    }
+
+    match /system/radar_match {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() &&
+        request.resource.data.homeTeam is string &&
+        request.resource.data.awayTeam is string &&
+        request.resource.data.homeFlag is string &&
+        request.resource.data.awayFlag is string &&
+        request.resource.data.stadium is string &&
+        request.resource.data.date is string &&
+        request.resource.data.probHome is int &&
+        request.resource.data.probDraw is int &&
+        request.resource.data.probAway is int &&
+        request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
+    }
+
+    match /predictions/{predictionId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.type == 'POLla_MUNDIALISTA' &&
+        request.resource.data.matchDetails is string &&
+        request.resource.data.prediction is string &&
+        request.resource.data.status == 'PENDIENTE' &&
+        (!('result' in request.resource.data) || request.resource.data.result == null);
+
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+  }
+}

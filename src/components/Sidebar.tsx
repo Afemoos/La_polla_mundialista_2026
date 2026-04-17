@@ -12,32 +12,32 @@ export default function Sidebar() {
       </div>
 
       <div className="nav-links">
-        <NavLink 
-          to="/" 
+        <NavLink
+          to="/"
           end
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
           <Trophy size={20} /> Principal
         </NavLink>
 
-        <NavLink 
-          to="/resultados" 
+        <NavLink
+          to="/resultados"
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
           <Star size={20} /> Podio Ganadores
         </NavLink>
-        
 
-        <NavLink 
-          to="/mis-apuestas" 
+
+        <NavLink
+          to="/mis-apuestas"
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
           <ListChecks size={20} /> Mis Apuestas
         </NavLink>
 
         {authCounter?.isAdmin && (
-          <NavLink 
-            to="/admin" 
+          <NavLink
+            to="/admin"
             className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
           >
             <Settings size={20} /> Admin

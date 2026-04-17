@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { db } from '../firebase';
-import { collection, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
+import { getAllPredictionsQuery, togglePredictionStatus, saveRadarMatch, resolveMatchResults } from '../services/firestore';
+import type { Prediction, RadarMatch } from '../types/firestore';
 import { CheckCircle, Radio } from 'lucide-react';
 
 const WORLD_CUP_TEAMS = [
@@ -31,7 +32,7 @@ const WORLD_CUP_TEAMS = [
 ];
 
 export default function Admin() {
-    const [allBets, setAllBets] = useState<any[]>([]);
+    const [allBets, setAllBets] = useState<Prediction[]>([]);
 
     const [radarHomeCode, setRadarHomeCode] = useState("co");
     const [radarAwayCode, setRadarAwayCode] = useState("br");
@@ -52,25 +53,21 @@ export default function Admin() {
     const matchOptions = Array.from(new Set(allBets.filter(b => !b.result && b.matchDetails).map(b => b.matchDetails as string)));
 
     useEffect(() => {
-        const q = collection(db, "predictions");
+        const q = getAllPredictionsQuery();
         // Escucha centralizada de todas las apuestas sin filtro
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const betsArray: any[] = [];
+            const betsArray: Prediction[] = [];
             querySnapshot.forEach((d) => {
-                betsArray.push({ id: d.id, ...d.data() });
+                betsArray.push({ id: d.id, ...d.data() } as Prediction);
             });
-            betsArray.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
             setAllBets(betsArray);
         });
         return () => unsubscribe();
     }, []);
 
     const toggleStatus = async (id: string, currentStatus: string) => {
-        const newStatus = currentStatus === "PENDIENTE" ? "PAGADO" : "PENDIENTE";
         try {
-            await updateDoc(doc(db, "predictions", id), {
-                status: newStatus
-            });
+            await togglePredictionStatus(id, currentStatus);
         } catch (error) {
             console.error("Error updating status", error);
         }
@@ -87,7 +84,7 @@ export default function Admin() {
             const homeName = WORLD_CUP_TEAMS.find(t => t.code === radarHomeCode)?.country || "Local";
             const awayName = WORLD_CUP_TEAMS.find(t => t.code === radarAwayCode)?.country || "Visitante";
             
-            await setDoc(doc(db, "system", "radar_match"), {
+            await saveRadarMatch({
                 homeTeam: homeName,
                 homeFlag: `https://flagcdn.com/w160/${radarHomeCode}.png`,
                 awayTeam: awayName,
@@ -97,7 +94,6 @@ export default function Admin() {
                 probHome: radarProbHome,
                 probDraw: radarProbDraw,
                 probAway: radarProbAway,
-                updatedAt: serverTimestamp()
             });
             alert("✅ ¡Radar Tricolor ha sido actualizado globalmente para todos los usuarios al instante!");
         } catch (error: any) {
@@ -116,17 +112,9 @@ export default function Admin() {
         setResolveWorking(true);
         try {
             const finalMarker = `${resolveScoreHome} - ${resolveScoreAway}`;
-            let countWinners = 0;
-            
-            const pendingBets = allBets.filter(b => b.matchDetails === resolveMatchName && !b.result);
-            
-            await Promise.all(pendingBets.map(async (bet) => {
-                const isWinner = bet.prediction === finalMarker ? "GANADOR" : "PERDEDOR";
-                if(isWinner === "GANADOR") countWinners++;
-                await updateDoc(doc(db, "predictions", bet.id), { result: isWinner });
-            }));
+            const { audited, winners } = await resolveMatchResults(allBets, resolveMatchName, finalMarker);
 
-            alert(`✅ PARTIDO SELLADO.\n\nApuestas Auditadas: ${pendingBets.length}\nAcertaron al exacto: ${countWinners}`);
+            alert(`✅ PARTIDO SELLADO.\n\nApuestas Auditadas: ${audited}\nAcertaron al exacto: ${winners}`);
             setResolveScoreHome(0);
             setResolveScoreAway(0);
             setResolveMatchName("");

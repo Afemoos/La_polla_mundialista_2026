@@ -1,27 +1,21 @@
 import { useEffect, useState } from 'react';
-import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
+import { getWinnersQuery } from '../services/firestore';
+import type { Prediction } from '../types/firestore';
 import { Medal, Star } from 'lucide-react';
 
 export default function Resultados() {
-    const [winners, setWinners] = useState<any[]>([]);
+    const [winners, setWinners] = useState<Prediction[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = collection(db, "predictions");
-        // Descargamos todo para no requerir un Indice manual de Firebase e iteramos localmente.
+        const q = getWinnersQuery();
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const betsArray: any[] = [];
+            const winnersArray: Prediction[] = [];
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                // Filtramos unicamente a la casta de ganadores
-                if (data.result === 'GANADOR') {
-                    betsArray.push({ id: doc.id, ...data });
-                }
+                winnersArray.push({ id: doc.id, ...doc.data() } as Prediction);
             });
-            // Ordenar por fecha del partido / creación para que los últimos ganadores salgan arriba
-            betsArray.sort((a,b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
-            setWinners(betsArray);
+            setWinners(winnersArray);
             setLoading(false);
         });
 
