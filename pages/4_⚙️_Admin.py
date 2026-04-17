@@ -11,8 +11,11 @@ st.set_page_config(page_title="Admin - Polla Mundialista", page_icon="⚙️", l
 
 # Validacion de admin maestros
 admin_emails = os.getenv("ADMIN_EMAILS", "afemos027@gmail.com").replace(" ", "").split(",")
-if "ADMIN_EMAILS" in st.secrets:
-    admin_emails = st.secrets["ADMIN_EMAILS"].replace(" ", "").split(",")
+try:
+    if "ADMIN_EMAILS" in st.secrets:
+        admin_emails = st.secrets["ADMIN_EMAILS"].replace(" ", "").split(",")
+except FileNotFoundError:
+    pass
 
 user_email = st.session_state.get("user_email", "")
 
