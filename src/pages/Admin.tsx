@@ -83,8 +83,7 @@ export default function Admin() {
         try {
             const homeName = WORLD_CUP_TEAMS.find(t => t.code === radarHomeCode)?.country || "Local";
             const awayName = WORLD_CUP_TEAMS.find(t => t.code === radarAwayCode)?.country || "Visitante";
-            
-            await saveRadarMatch({
+            const radarMatch: RadarMatch = {
                 homeTeam: homeName,
                 homeFlag: `https://flagcdn.com/w160/${radarHomeCode}.png`,
                 awayTeam: awayName,
@@ -94,7 +93,9 @@ export default function Admin() {
                 probHome: radarProbHome,
                 probDraw: radarProbDraw,
                 probAway: radarProbAway,
-            });
+            };
+
+            await saveRadarMatch(radarMatch);
             alert("✅ ¡Radar Tricolor ha sido actualizado globalmente para todos los usuarios al instante!");
         } catch (error: any) {
             alert("Error al actualizar Radar: " + error.message);

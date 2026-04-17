@@ -1,10 +1,10 @@
 export interface Prediction {
-  id?: string;
+  id: string;
   email?: string;
   type?: string;
   matchDetails?: string;
   prediction?: string;
-  status?: 'PENDIENTE' | 'PAGADO';
+  status: 'PENDIENTE' | 'PAGADO';
   timestamp?: any;
   result?: 'GANADOR' | 'PERDEDOR' | string | null;
 }
