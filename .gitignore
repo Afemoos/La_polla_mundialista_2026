@@ -1,14 +1,25 @@
-# .gitignore
-# Ambientes virtuales
-venv/
-env/
-.env
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Archivos de la caché de Python
-__pycache__/
-*.py[cod]
-*$py.class
+node_modules
+dist
+dist-ssr
+*.local
 
-# Configuración de los servicios cloud o credenciales sensibles
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 credenciales_gcp.json
-.streamlit/secrets.toml
