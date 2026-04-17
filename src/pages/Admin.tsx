@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Settings, CheckCircle, Radio } from 'lucide-react';
+import { CheckCircle, Radio } from 'lucide-react';
 
 const WORLD_CUP_TEAMS = [
     { country: "Argentina", code: "ar" },
