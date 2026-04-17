@@ -16,6 +16,15 @@ def init_auth():
         st.session_state["user_email"] = None
         st.session_state["user_name"] = None
 
+    if st.session_state.get("user_email"):
+        st.sidebar.markdown("---")
+        st.sidebar.write("👤 Conectado como:")
+        st.sidebar.info(f"{st.session_state['user_email']}")
+        if st.sidebar.button("🚪 Cerrar Sesión"):
+            st.session_state["user_email"] = None
+            st.rerun()
+        return
+
     if not client_id:
         st.warning("⚠️ Configuración de Google OAuth incompleta. Se ha habilitado un login de prueba temporal.")
         # TODO: Quitar entrada de prueba temporal cuando las credenciales estén listas

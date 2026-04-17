@@ -70,5 +70,29 @@ class SheetsDB:
             st.error(f"Error al guardar: {e}")
             return False
 
+    def update_payment_status(self, worksheet_name, timestamp, email, new_status):
+        """Busca un registro por su timestamp y corréo para actualizar su estado de pago"""
+        sheet = self.get_sheet(worksheet_name)
+        if not sheet: return False
+        try:
+            registros = sheet.get_all_records()
+            # Encontrar el registro exacto
+            for i, r in enumerate(registros):
+                if str(r.get('Timestamp', '')) == str(timestamp) and str(r.get('Email_Usuario', '')).strip().lower() == email.strip().lower():
+                    # gspread maneja indices 1-based, y la cabecera es la fila 1.
+                    # Entonces r es index i. Fila real = i + 2
+                    row_real = i + 2
+                    
+                    # Encontrar en que columna esta Estado_Pago
+                    headers = sheet.row_values(1)
+                    if 'Estado_Pago' in headers:
+                        col_real = headers.index('Estado_Pago') + 1
+                        sheet.update_cell(row_real, col_real, new_status)
+                        return True
+            return False
+        except Exception as e:
+            st.error(f"Error actualizando el estado: {e}")
+            return False
+
 # Instancia global (Singleton-like behavior para este módulo)
 db = SheetsDB()
