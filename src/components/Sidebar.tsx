@@ -1,7 +1,6 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, Zap, ListChecks, Settings, LogOut, Star } from 'lucide-react';
+import { Trophy, ListChecks, LogOut, Star } from 'lucide-react';
 
 export default function Sidebar() {
   const authCounter = useAuth();
