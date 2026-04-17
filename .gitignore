@@ -1,0 +1,14 @@
+# .gitignore
+# Ambientes virtuales
+venv/
+env/
+.env
+
+# Archivos de la caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuración de los servicios cloud o credenciales sensibles
+credenciales_gcp.json
+.streamlit/secrets.toml
