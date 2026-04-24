@@ -34,15 +34,6 @@ const WORLD_CUP_TEAMS = [
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
 
-    const [radarHomeCode, setRadarHomeCode] = useState("co");
-    const [radarAwayCode, setRadarAwayCode] = useState("br");
-    const [radarStadium, setRadarStadium] = useState("Metropolitano Roberto Meléndez");
-    const [radarDate, setRadarDate] = useState("");
-    const [radarProbHome, setRadarProbHome] = useState(45);
-    const [radarProbDraw, setRadarProbDraw] = useState(45);
-    const [radarProbAway, setRadarProbAway] = useState(10);
-    const [radarSaving, setRadarSaving] = useState(false);
-
     // Estados para la Clausura de Partidos
     const [resolveMatchName, setResolveMatchName] = useState("");
     const [resolveScoreHome, setResolveScoreHome] = useState(0);
@@ -71,36 +62,6 @@ export default function Admin() {
         } catch (error) {
             console.error("Error updating status", error);
         }
-    };
-
-    const handleRadarSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (radarProbHome + radarProbDraw + radarProbAway !== 100) {
-            alert("❌ ERROR: Las sumatorias de probabilidades deben dar exactamente 100%.");
-            return;
-        }
-        setRadarSaving(true);
-        try {
-            const homeName = WORLD_CUP_TEAMS.find(t => t.code === radarHomeCode)?.country || "Local";
-            const awayName = WORLD_CUP_TEAMS.find(t => t.code === radarAwayCode)?.country || "Visitante";
-            const radarMatch: RadarMatch = {
-                homeTeam: homeName,
-                homeFlag: `https://flagcdn.com/w160/${radarHomeCode}.png`,
-                awayTeam: awayName,
-                awayFlag: `https://flagcdn.com/w160/${radarAwayCode}.png`,
-                date: radarDate,
-                stadium: radarStadium,
-                probHome: radarProbHome,
-                probDraw: radarProbDraw,
-                probAway: radarProbAway,
-            };
-
-            await saveRadarMatch(radarMatch);
-            alert("✅ ¡Radar Tricolor ha sido actualizado globalmente para todos los usuarios al instante!");
-        } catch (error: any) {
-            alert("Error al actualizar Radar: " + error.message);
-        }
-        setRadarSaving(false);
     };
 
     const handleResolveMatch = async (e: React.FormEvent) => {
@@ -132,70 +93,6 @@ export default function Admin() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
                 Vista protegida. Haz clic en el estado de cualquier pago para alternarlo en tiempo real entre PENDIENTE y PAGADO.
             </p>
-
-            {/* CONTROL DEL RADAR TRICOLOR */}
-            <div className="glass-card" style={{ marginBottom: '2rem', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem', color: 'var(--primary)' }}>
-                    <Radio size={20} /> Transmisión Maestro (Cambiar Partido)
-                </h3>
-                <form onSubmit={handleRadarSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Local</label>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                <img src={`https://flagcdn.com/w40/${radarHomeCode}.png`} width="25" alt="bandera" style={{ borderRadius: '4px' }}/>
-                                <select className="input-field" value={radarHomeCode} onChange={e => setRadarHomeCode(e.target.value)} required>
-                                    {WORLD_CUP_TEAMS.map(t => <option key={t.code} value={t.code}>{t.country}</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Visitante</label>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                <img src={`https://flagcdn.com/w40/${radarAwayCode}.png`} width="25" alt="bandera" style={{ borderRadius: '4px' }}/>
-                                <select className="input-field" value={radarAwayCode} onChange={e => setRadarAwayCode(e.target.value)} required>
-                                    {WORLD_CUP_TEAMS.map(t => <option key={t.code} value={t.code}>{t.country}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Estadio</label>
-                            <input type="text" className="input-field" value={radarStadium} onChange={e => setRadarStadium(e.target.value)} placeholder="Ej: Hard Rock Stadium" required />
-                        </div>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Fecha y Hora Local</label>
-                            <input type="datetime-local" className="input-field" value={radarDate} onChange={e => setRadarDate(e.target.value)} required />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Probabilidades (Debe sumar 100%)</label>
-                        <div style={{ display: 'flex', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                                <span style={{ fontSize:'0.7rem', color:'#00FF88', display:'block', marginBottom:'5px'}}>% GANA LOCAL</span>
-                                <input type="number" className="input-field" style={{ textAlign: 'center' }} min="0" max="100" value={radarProbHome} onChange={e => setRadarProbHome(Number(e.target.value))} required />
-                            </div>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                                <span style={{ fontSize:'0.7rem', color:'var(--primary)', display:'block', marginBottom:'5px'}}>% EMPATE</span>
-                                <input type="number" className="input-field" style={{ textAlign: 'center' }} min="0" max="100" value={radarProbDraw} onChange={e => setRadarProbDraw(Number(e.target.value))} required />
-                            </div>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                                <span style={{ fontSize:'0.7rem', color:'var(--accent-rd)', display:'block', marginBottom:'5px'}}>% GANA VISITA</span>
-                                <input type="number" className="input-field" style={{ textAlign: 'center' }} min="0" max="100" value={radarProbAway} onChange={e => setRadarProbAway(Number(e.target.value))} required />
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" className="button-primary" style={{ marginTop: '0.5rem', background: 'var(--primary)', color: '#000' }} disabled={radarSaving}>
-                        {radarSaving ? "Publicando en Vivo..." : "Publicar Radar Globalmente"}
-                    </button>
-                </form>
-            </div>
 
             {/* RESOLUCIÓN DE VICTORIAS */}
             <div className="glass-card" style={{ marginBottom: '2rem', border: '1px solid rgba(255, 0, 85, 0.3)' }}>

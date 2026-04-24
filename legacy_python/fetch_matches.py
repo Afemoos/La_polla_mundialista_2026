@@ -20,6 +20,39 @@ LEAGUES_TO_CHECK = [
     {"id": 1, "name": "World Cup 2026", "season": 2026},
     {"id": 2, "name": "Champions League", "season": 2025}
 ]
+COLOMBIA_TEAM_ID = 8
+
+def fetch_predictions(fixture_id):
+    print(f"Obteniendo probabilidades para el partido {fixture_id}...")
+    pred_url = f"https://v3.football.api-sports.io/predictions?fixture={fixture_id}"
+    pred_response = requests.get(pred_url, headers=HEADERS)
+    
+    prob_home = 33
+    prob_draw = 33
+    prob_away = 34
+    
+    if pred_response.status_code == 200:
+        pred_data = pred_response.json()
+        if pred_data.get("response") and len(pred_data["response"]) > 0:
+            percents = pred_data["response"][0]["predictions"]["percent"]
+            prob_home = int(percents.get("home", "33%").replace("%", ""))
+            prob_draw = int(percents.get("draw", "33%").replace("%", ""))
+            prob_away = int(percents.get("away", "34%").replace("%", ""))
+            print(f"  Probabilidades -> Local: {prob_home}% | Empate: {prob_draw}% | Visitante: {prob_away}%")
+    return prob_home, prob_draw, prob_away
+
+def build_radar_obj(fixture, prob_home, prob_draw, prob_away):
+    return {
+        "homeTeam": fixture['teams']['home']['name'],
+        "homeFlag": fixture['teams']['home']['logo'],
+        "awayTeam": fixture['teams']['away']['name'],
+        "awayFlag": fixture['teams']['away']['logo'],
+        "date": fixture['fixture']['date'],
+        "stadium": fixture['fixture']['venue']['name'] or "Estadio por definir",
+        "probHome": prob_home,
+        "probDraw": prob_draw,
+        "probAway": prob_away,
+    }
 
 def main():
     print("Iniciando búsqueda de próximos partidos...")
@@ -27,8 +60,8 @@ def main():
         print("ERROR: API_FOOTBALL_KEY no está configurada en las variables de entorno.")
         return
 
+    # --- 1. BUSCAR PARTIDO GLOBAL (MUNDIAL/CHAMPIONS) ---
     upcoming_fixtures = []
-
     for league in LEAGUES_TO_CHECK:
         print(f"Buscando el próximo partido para la liga: {league['name']}...")
         url = f"https://v3.football.api-sports.io/fixtures?league={league['id']}&season={league['season']}&next=1"
@@ -46,70 +79,59 @@ def main():
         else:
             print(f"  Error consultando la API: {response.text}")
 
-    if not upcoming_fixtures:
-        print("No se encontraron partidos próximos para las ligas configuradas. Terminando.")
-        return
+    radar_match_global = None
+    if upcoming_fixtures:
+        upcoming_fixtures.sort(key=lambda x: x["fixture"]["timestamp"])
+        next_match = upcoming_fixtures[0]
+        h, d, a = fetch_predictions(next_match["fixture"]["id"])
+        radar_match_global = build_radar_obj(next_match, h, d, a)
 
-    # Ordenar todos los partidos encontrados por fecha para escoger el más inminente
-    upcoming_fixtures.sort(key=lambda x: x["fixture"]["timestamp"])
-    next_match = upcoming_fixtures[0]
-    fixture_id = next_match["fixture"]["id"]
+    # --- 2. BUSCAR PARTIDO DE COLOMBIA ---
+    print("\nBuscando el próximo partido para Colombia...")
+    radar_match_colombia = None
+    url_col = f"https://v3.football.api-sports.io/fixtures?team={COLOMBIA_TEAM_ID}&next=1"
+    response_col = requests.get(url_col, headers=HEADERS)
+    if response_col.status_code == 200:
+        data_col = response_col.json()
+        if data_col.get("errors") and "plan" in data_col["errors"]:
+            print(f"  [ALERTA DE PAGO] API-Football bloqueó la consulta de equipo: {data_col['errors']['plan']}")
+        elif data_col.get("response") and len(data_col["response"]) > 0:
+            col_match = data_col["response"][0]
+            print(f"  Encontrado: {col_match['teams']['home']['name']} vs {col_match['teams']['away']['name']}")
+            h, d, a = fetch_predictions(col_match["fixture"]["id"])
+            radar_match_colombia = build_radar_obj(col_match, h, d, a)
+        else:
+            print("  No hay partidos próximos para Colombia.")
+    else:
+        print(f"  Error consultando la API para Colombia: {response_col.text}")
 
-    print(f"\nEl partido más próximo en el calendario es:")
-    print(f"{next_match['teams']['home']['name']} vs {next_match['teams']['away']['name']} (ID: {fixture_id})")
-
-    # Consultar las predicciones/probabilidades
-    print(f"Obteniendo probabilidades para el partido {fixture_id}...")
-    pred_url = f"https://v3.football.api-sports.io/predictions?fixture={fixture_id}"
-    pred_response = requests.get(pred_url, headers=HEADERS)
-    
-    # Valores por defecto en caso de no haber datos de predicción
-    prob_home = 33
-    prob_draw = 33
-    prob_away = 34
-    
-    if pred_response.status_code == 200:
-        pred_data = pred_response.json()
-        if pred_data.get("response") and len(pred_data["response"]) > 0:
-            percents = pred_data["response"][0]["predictions"]["percent"]
-            prob_home = int(percents.get("home", "33%").replace("%", ""))
-            prob_draw = int(percents.get("draw", "33%").replace("%", ""))
-            prob_away = int(percents.get("away", "34%").replace("%", ""))
-            print(f"  Probabilidades -> Local: {prob_home}% | Empate: {prob_draw}% | Visitante: {prob_away}%")
-
-    # Preparar el objeto Radar Tricolor para React
-    radar_match = {
-        "homeTeam": next_match['teams']['home']['name'],
-        "homeFlag": next_match['teams']['home']['logo'],
-        "awayTeam": next_match['teams']['away']['name'],
-        "awayFlag": next_match['teams']['away']['logo'],
-        "date": next_match['fixture']['date'],
-        "stadium": next_match['fixture']['venue']['name'] or "Estadio por definir",
-        "probHome": prob_home,
-        "probDraw": prob_draw,
-        "probAway": prob_away,
-    }
-
+    # --- 3. GUARDAR EN FIRESTORE ---
     print("\nConectando a Firebase Firestore...")
     try:
-        # Autenticación dual (Nube vs Local)
+        # Intenta usar la ruta segura si el archivo falta en la raiz
+        credentials_path = CREDENTIALS_FILE if os.path.exists(CREDENTIALS_FILE) else f"../{CREDENTIALS_FILE}"
+
         if "GCP_CREDENTIALS" in os.environ:
             creds_dict = json.loads(os.environ["GCP_CREDENTIALS"])
             firebase_creds = credentials.Certificate(creds_dict)
         else:
-            firebase_creds = credentials.Certificate(CREDENTIALS_FILE)
+            firebase_creds = credentials.Certificate(credentials_path)
 
         if not firebase_admin._apps:
             firebase_admin.initialize_app(firebase_creds)
         db = firestore.client()
 
-        print("Actualizando el documento system/radar_match...")
-        radar_ref = db.collection("system").document("radar_match")
+        if radar_match_global:
+            print("Actualizando el documento system/radar_match...")
+            radar_match_global["updatedAt"] = firestore.SERVER_TIMESTAMP
+            db.collection("system").document("radar_match").set(radar_match_global)
+
+        if radar_match_colombia:
+            print("Actualizando el documento system/colombia_match...")
+            radar_match_colombia["updatedAt"] = firestore.SERVER_TIMESTAMP
+            db.collection("system").document("colombia_match").set(radar_match_colombia)
         
-        radar_match["updatedAt"] = firestore.SERVER_TIMESTAMP
-        radar_ref.set(radar_match)
-        
-        print("✅ ¡El Radar Tricolor fue actualizado globalmente en Firebase!")
+        print("✅ ¡Ambos radares actualizados exitosamente en Firebase!")
 
     except Exception as e:
         import traceback
