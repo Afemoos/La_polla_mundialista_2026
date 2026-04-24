@@ -1,9 +1,9 @@
 name: Sincronización de Contabilidad
 
 on:
-  # Se ejecuta automáticamente todos los días a las 05:00 UTC (Media noche en Colombia/Perú)
+  # Se ejecuta automáticamente cada 5 minutos (Plan PRO de API-Football)
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '*/5 * * * *'
   
   # Permite ejecutar el bot manualmente desde un botón en la página web de GitHub
   workflow_dispatch:
