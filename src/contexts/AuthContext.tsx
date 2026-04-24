@@ -19,7 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Define los administradores aquí (igual que en tu viejo secrets.toml)
-const ADMIN_EMAILS = ["afemos027@gmail.com", "afemos023@gmail.com"];
+const ADMIN_EMAILS = ["afemos027@gmail.com", "afemos023@gmail.com", "daar.523@gmail.com"];
 
 export function useAuth() {
     return useContext(AuthContext);

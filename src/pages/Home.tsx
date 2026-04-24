@@ -34,6 +34,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
             await addDoc(collection(db, "predictions"), {
                 email: currentUser?.email,
                 type: "POLla_MUNDIALISTA",
+                fixtureId: matchData.fixtureId || null,
                 matchDetails: `${matchData.teams.home.name} vs ${matchData.teams.away.name}`,
                 prediction: `${scoreHome} - ${scoreAway}`,
                 status: "PENDIENTE",
@@ -150,6 +151,7 @@ export default function Home() {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setGlobalMatch({
+                    fixtureId: data.fixtureId,
                     teams: { home: { name: data.homeTeam, logo: data.homeFlag }, away: { name: data.awayTeam, logo: data.awayFlag } },
                     fixture: { date: data.date, venue: { name: data.stadium } },
                     probHome: data.probHome, probDraw: data.probDraw, probAway: data.probAway
@@ -163,6 +165,7 @@ export default function Home() {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setColombiaMatch({
+                    fixtureId: data.fixtureId,
                     teams: { home: { name: data.homeTeam, logo: data.homeFlag }, away: { name: data.awayTeam, logo: data.awayFlag } },
                     fixture: { date: data.date, venue: { name: data.stadium } },
                     probHome: data.probHome, probDraw: data.probDraw, probAway: data.probAway

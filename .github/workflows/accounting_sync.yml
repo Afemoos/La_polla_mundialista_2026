@@ -41,3 +41,10 @@ jobs:
           GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
         run: |
           python legacy_python/contabilidad.py
+
+      - name: 🕵🏻‍♂️ Ejecutar Auditor de Apuestas
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          python legacy_python/auditor.py

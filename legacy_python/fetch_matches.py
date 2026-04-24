@@ -43,6 +43,7 @@ def fetch_predictions(fixture_id):
 
 def build_radar_obj(fixture, prob_home, prob_draw, prob_away):
     return {
+        "fixtureId": fixture['fixture']['id'],
         "homeTeam": fixture['teams']['home']['name'],
         "homeFlag": fixture['teams']['home']['logo'],
         "awayTeam": fixture['teams']['away']['name'],

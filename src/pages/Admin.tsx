@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { getAllPredictionsQuery, togglePredictionStatus, resolveMatchResults } from '../services/firestore';
+import { getAllPredictionsQuery, togglePredictionStatus } from '../services/firestore';
 import type { Prediction } from '../types/firestore';
 import { CheckCircle } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
 
-    // Estados para la Clausura de Partidos
-    const [resolveMatchName, setResolveMatchName] = useState("");
-    const [resolveScoreHome, setResolveScoreHome] = useState(0);
-    const [resolveScoreAway, setResolveScoreAway] = useState(0);
-    const [resolveWorking, setResolveWorking] = useState(false);
-
-    // Extraer opciones únicas de los detalles de las apuestas activas (sin resultado todavía)
-    const matchOptions = Array.from(new Set(allBets.filter(b => !b.result && b.matchDetails).map(b => b.matchDetails as string)));
+    // Solo retenemos los estados y lógica de control de ingresos
 
     useEffect(() => {
         const q = getAllPredictionsQuery();
@@ -37,28 +30,7 @@ export default function Admin() {
         }
     };
 
-    const handleResolveMatch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!resolveMatchName) return;
-
-        const isConfirmed = window.confirm(`¿Seguro que deseas sellar el partido "${resolveMatchName}" con el marcador ${resolveScoreHome}-${resolveScoreAway}?\n\nEsta acción procesará dictámenes de GANADOR/PERDEDOR de forma irreversible.`);
-        if(!isConfirmed) return;
-
-        setResolveWorking(true);
-        try {
-            const finalMarker = `${resolveScoreHome} - ${resolveScoreAway}`;
-            const { audited, winners } = await resolveMatchResults(allBets, resolveMatchName, finalMarker);
-
-            alert(`✅ PARTIDO SELLADO.\n\nApuestas Auditadas: ${audited}\nAcertaron al exacto: ${winners}`);
-            setResolveScoreHome(0);
-            setResolveScoreAway(0);
-            setResolveMatchName("");
-        } catch (error: any) {
-            alert("Error al auditar marcadores: " + error.message);
-        }
-        setResolveWorking(false);
-    };
-
+    // Eliminado: handleResolveMatch ya no es necesario porque auditor.py lo hace automáticamente
     return (
         <div className="fade-in">
             <h1 className="page-title">⚙️ Panel de Administración</h1>
@@ -67,42 +39,7 @@ export default function Admin() {
                 Vista protegida. Haz clic en el estado de cualquier pago para alternarlo en tiempo real entre PENDIENTE y PAGADO.
             </p>
 
-            {/* RESOLUCIÓN DE VICTORIAS */}
-            <div className="glass-card" style={{ marginBottom: '2rem', border: '1px solid rgba(255, 0, 85, 0.3)' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem', color: 'var(--accent-rd)' }}>
-                    🏁 Clausurar Partido (Auditoría)
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                    Selecciona un evento de la base de datos y estipula su marcador final oficial. El algoritmo recorrerá todas las apuestas de los usuarios y les dictaminará victoria o derrota.
-                </p>
-
-                <form onSubmit={handleResolveMatch} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Evento a Evaluar</label>
-                        <select className="input-field" value={resolveMatchName} onChange={e => setResolveMatchName(e.target.value)} required>
-                            <option value="">Selecciona el partido...</option>
-                            {matchOptions.map((m, idx) => <option key={idx} value={m}>{m}</option>)}
-                        </select>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles Local</label>
-                            <input type="number" className="input-field" min="0" max="20" value={resolveScoreHome} onChange={e => setResolveScoreHome(Number(e.target.value))} required />
-                        </div>
-                        <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-muted)' }}>-</div>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles Visitante</label>
-                            <input type="number" className="input-field" min="0" max="20" value={resolveScoreAway} onChange={e => setResolveScoreAway(Number(e.target.value))} required />
-                        </div>
-                    </div>
-
-                    <button type="submit" className="button-primary" style={{ marginTop: '0.5rem', background: 'var(--accent-rd)', color: '#fff' }} disabled={resolveWorking || matchOptions.length === 0}>
-                        {resolveWorking ? "Escudriñando Base de Datos..." : "Auditar Ganadores"}
-                    </button>
-                </form>
-            </div>
-
+            {/* PANEL ÚNICO PARA ADMINISTRADORES */}
             <div className="glass-card">
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle size={20} color="#00FF88" /> Panel de Control de Ingresos
