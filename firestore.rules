@@ -27,6 +27,21 @@ service cloud.firestore {
         request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
     }
 
+    match /system/colombia_match {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() &&
+        request.resource.data.homeTeam is string &&
+        request.resource.data.awayTeam is string &&
+        request.resource.data.homeFlag is string &&
+        request.resource.data.awayFlag is string &&
+        request.resource.data.stadium is string &&
+        request.resource.data.date is string &&
+        request.resource.data.probHome is int &&
+        request.resource.data.probDraw is int &&
+        request.resource.data.probAway is int &&
+        request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
+    }
+
     match /predictions/{predictionId} {
       allow read: if isAuthenticated();
 
