@@ -26,6 +26,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r legacy_python/requirements_bot.txt
           
+      - name: ⚽ Actualizar Radar Tricolor (API-Football)
+        env:
+          # Inyectamos el JSON secreto de Firebase
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          # Inyectamos la clave secreta de API-Football
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          python legacy_python/fetch_matches.py
+
       - name: 🚀 Ejecutar Cerebro Contable
         env:
           # Inyectamos el JSON secreto desde la configuración de GitHub
