@@ -1,35 +1,8 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { getAllPredictionsQuery, togglePredictionStatus, saveRadarMatch, resolveMatchResults } from '../services/firestore';
-import type { Prediction, RadarMatch } from '../types/firestore';
-import { CheckCircle, Radio } from 'lucide-react';
-
-const WORLD_CUP_TEAMS = [
-    { country: "Argentina", code: "ar" },
-    { country: "Brasil", code: "br" },
-    { country: "Colombia", code: "co" },
-    { country: "Uruguay", code: "uy" },
-    { country: "Ecuador", code: "ec" },
-    { country: "Venezuela", code: "ve" },
-    { country: "Perú", code: "pe" },
-    { country: "Chile", code: "cl" },
-    { country: "Paraguay", code: "py" },
-    { country: "Bolivia", code: "bo" },
-    { country: "Francia", code: "fr" },
-    { country: "Inglaterra", code: "gb-eng" },
-    { country: "España", code: "es" },
-    { country: "Alemania", code: "de" },
-    { country: "Portugal", code: "pt" },
-    { country: "Italia", code: "it" },
-    { country: "Países Bajos", code: "nl" },
-    { country: "Estados Unidos", code: "us" },
-    { country: "México", code: "mx" },
-    { country: "Canadá", code: "ca" },
-    { country: "Marruecos", code: "ma" },
-    { country: "Senegal", code: "sn" },
-    { country: "Japón", code: "jp" },
-    { country: "Corea del Sur", code: "kr" },
-];
+import { getAllPredictionsQuery, togglePredictionStatus, resolveMatchResults } from '../services/firestore';
+import type { Prediction } from '../types/firestore';
+import { CheckCircle } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
