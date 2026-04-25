@@ -55,10 +55,10 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 <Icon color={color} /> {title}
             </h2>
             
-            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center', border: `1px solid ${color}33` }}>
+            <div className="glass-card radar-teams" style={{ border: `1px solid ${color}33` }}>
                 <div style={{ flex: 1 }}>
                     <img src={matchData.teams.home.logo} width="80" alt="Home" />
-                    <h3 style={{ marginTop: '10px' }}>{matchData.teams.home.name}</h3>
+                    <h3 style={{ marginTop: '10px', fontSize: 'clamp(1rem, 4vw, 1.3rem)' }}>{matchData.teams.home.name}</h3>
                 </div>
                 
                 <div style={{ flex: 1 }}>
@@ -76,11 +76,11 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
 
                 <div style={{ flex: 1 }}>
                     <img src={matchData.teams.away.logo} width="80" alt="Away" />
-                    <h3 style={{ marginTop: '10px' }}>{matchData.teams.away.name}</h3>
+                    <h3 style={{ marginTop: '10px', fontSize: 'clamp(1rem, 4vw, 1.3rem)' }}>{matchData.teams.away.name}</h3>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+            <div className="radar-prob">
                 <div style={{ flex: 1, background: 'rgba(0, 255, 136, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(0,255,136,0.3)' }}>
                     <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana Home</div>
                     <div style={{ fontWeight: 800, color: '#00FF88' }}>{matchData.probHome}%</div>
@@ -105,8 +105,8 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 </p>
                 
                 <form onSubmit={submitPrediction}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-                        <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 40%', minWidth: '100px' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.home.name}</label>
                             <input 
                                 type="number" 
@@ -119,7 +119,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                             />
                         </div>
                         <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-muted)' }}>-</div>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: '1 1 40%', minWidth: '100px' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.away.name}</label>
                             <input 
                                 type="number" 
