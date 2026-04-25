@@ -82,7 +82,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
 
             <div className="radar-prob">
                 <div style={{ flex: 1, background: 'rgba(0, 255, 136, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(0,255,136,0.3)' }}>
-                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana Home</div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.home.name}</div>
                     <div style={{ fontWeight: 800, color: '#00FF88' }}>{matchData.probHome}%</div>
                 </div>
                 <div style={{ flex: 1, background: 'rgba(255, 215, 0, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,215,0,0.3)' }}>
@@ -90,7 +90,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                     <div style={{ fontWeight: 800, color: 'var(--primary)' }}>{matchData.probDraw}%</div>
                 </div>
                 <div style={{ flex: 1, background: 'rgba(255, 0, 85, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,0,85,0.3)' }}>
-                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana Away</div>
+                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.away.name}</div>
                     <div style={{ fontWeight: 800, color: 'var(--accent-rd)' }}>{matchData.probAway}%</div>
                 </div>
             </div>
@@ -110,7 +110,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.home.name}</label>
                             <input 
                                 type="number" 
-                                className="input-field" 
+                                className="styled-input" 
                                 min="0" 
                                 max="20"
                                 value={scoreHome}
@@ -123,7 +123,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.away.name}</label>
                             <input 
                                 type="number" 
-                                className="input-field" 
+                                className="styled-input" 
                                 min="0" 
                                 max="20"
                                 value={scoreAway}
@@ -132,7 +132,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                             />
                         </div>
                     </div>
-                    <button type="submit" className="button-primary" style={{ width: '100%' }} disabled={isSubmitting}>
+                    <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={isSubmitting}>
                         {isSubmitting ? 'Registrando apuesta...' : 'Enviar Marcador Cerrado'}
                     </button>
                 </form>
