@@ -37,6 +37,8 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 fixtureId: matchData.fixtureId || null,
                 matchDetails: `${matchData.teams.home.name} vs ${matchData.teams.away.name}`,
                 prediction: `${scoreHome} - ${scoreAway}`,
+                homeLogo: matchData.teams.home.logo,
+                awayLogo: matchData.teams.away.logo,
                 status: "PENDIENTE",
                 timestamp: serverTimestamp()
             });

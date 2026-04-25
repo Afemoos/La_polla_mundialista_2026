@@ -77,7 +77,8 @@ export default function MisApuestas() {
                                     <th>Ticket ID</th>
                                     <th>Fecha</th>
                                     <th>Evento</th>
-                                    <th>Marcador</th>
+                                    <th>Marcador Apostado</th>
+                                    <th>Marcador Oficial</th>
                                     <th>Pago</th>
                                     <th>Resultado</th>
                                     <th>Acciones</th>
@@ -111,7 +112,24 @@ export default function MisApuestas() {
                                             {bet.timestamp ? new Date(bet.timestamp.toDate()).toLocaleString() : 'Cargando...'}
                                         </td>
                                         <td style={{ fontWeight: 600 }}>{bet.matchDetails || bet.type}</td>
-                                        <td>{bet.prediction}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {bet.homeLogo && <img src={bet.homeLogo} width="20" alt="Home" />}
+                                                <span style={{ fontWeight: 800 }}>{bet.prediction}</span>
+                                                {bet.awayLogo && <img src={bet.awayLogo} width="20" alt="Away" />}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {bet.finalScore ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {bet.homeLogo && <img src={bet.homeLogo} width="20" alt="Home" />}
+                                                    <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{bet.finalScore}</span>
+                                                    {bet.awayLogo && <img src={bet.awayLogo} width="20" alt="Away" />}
+                                                </div>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                            )}
+                                        </td>
                                         <td>
                                             <span className={`badge ${bet.status === 'PAGADO' ? 'paid' : 'pending'}`}>
                                                 {bet.status}
@@ -125,7 +143,7 @@ export default function MisApuestas() {
                                         <td>
                                             {!bet.result && (
                                                 <>
-                                                    {bet.status === 'PENDIENTE' && (
+                                                    {(bet.status === 'PENDIENTE' || !bet.status) && (
                                                 <button 
                                                     onClick={() => handleDelete(bet.id!)}
                                                     className="btn-danger-small"

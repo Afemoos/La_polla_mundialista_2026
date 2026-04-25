@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, ListChecks, LogOut, Star, Settings, Globe } from 'lucide-react';
+import { Trophy, ListChecks, LogOut, CalendarDays, Settings, Globe } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           onClick={handleLinkClick}
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
-          <Star size={20} /> Podio ganadores
+          <CalendarDays size={20} /> Resultados
         </NavLink>
 
 

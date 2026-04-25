@@ -16,7 +16,20 @@ HEADERS = {
     'x-rapidapi-key': API_KEY
 }
 
-def check_match_status(fixture_id):
+def update_api_status(db, response_headers):
+    if 'x-ratelimit-requests-current' in response_headers:
+        current_req = response_headers['x-ratelimit-requests-current']
+        limit_req = response_headers.get('x-ratelimit-requests-limit', '7500')
+        try:
+            db.collection("system").document("api_status").set({
+                "requests_current": int(current_req),
+                "requests_limit": int(limit_req),
+                "last_updated": firestore.SERVER_TIMESTAMP
+            }, merge=True)
+        except Exception as e:
+            print(f"Error actualizando api_status: {e}")
+
+def check_match_status(fixture_id, db=None):
     """
     Consulta la API para obtener el estado y el marcador del partido.
     Retorna (is_finished, final_score)
@@ -25,6 +38,7 @@ def check_match_status(fixture_id):
     time.sleep(0.5) # Prevención de Rate Limit (R/S)
     response = requests.get(url, headers=HEADERS)
     if response.status_code == 200:
+        if db: update_api_status(db, response.headers)
         data = response.json()
         if data.get("response") and len(data["response"]) > 0:
             fixture_data = data["response"][0]
@@ -102,7 +116,7 @@ def main():
         # 2. Auditar cada partido
         for f_id, bets in pending_audits.items():
             print(f"Consultando estado del partido ID: {f_id}...")
-            is_finished, final_score = check_match_status(f_id)
+            is_finished, final_score = check_match_status(f_id, db)
             
             if is_finished and final_score:
                 print(f"  ✅ El partido ha finalizado. Marcador oficial (incluyendo Tiempos Extra, sin penales): {final_score}")
@@ -116,7 +130,7 @@ def main():
                     is_winner = "GANADA" if bet["prediction"] == final_score else "PERDIDA"
                     if is_winner == "GANADA":
                         winners += 1
-                    batch.update(bet_ref, {"result": is_winner})
+                    batch.update(bet_ref, {"result": is_winner, "finalScore": final_score})
                 
                 batch.commit()
                 print(f"  ✅ Partidas auditadas. {winners} ganadores.")

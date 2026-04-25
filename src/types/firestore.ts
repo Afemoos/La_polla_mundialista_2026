@@ -7,6 +7,9 @@ export interface Prediction {
   status: 'PENDIENTE' | 'PAGADO' | 'CANCELACION_SOLICITADA' | 'CANCELADA';
   timestamp?: any;
   result?: 'GANADA' | 'PERDIDA' | string | null;
+  finalScore?: string;
+  homeLogo?: string;
+  awayLogo?: string;
 }
 
 export interface RadarMatch {

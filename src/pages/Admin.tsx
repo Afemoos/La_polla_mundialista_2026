@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot } from 'firebase/firestore';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { getAllPredictionsQuery, togglePredictionStatus, resolveCancellation } from '../services/firestore';
 import type { Prediction } from '../types/firestore';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Wifi } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
+    const [apiStatus, setApiStatus] = useState<{ requests_current: number; requests_limit: number; last_updated: any } | null>(null);
 
     // Solo retenemos los estados y lógica de control de ingresos
 
@@ -20,6 +22,16 @@ export default function Admin() {
             setAllBets(betsArray);
         });
         return () => unsubscribe();
+    }, []);
+
+    // Escuchar el estado de la API en tiempo real
+    useEffect(() => {
+        const unsubApi = onSnapshot(doc(db, 'system', 'api_status'), (snap) => {
+            if (snap.exists()) {
+                setApiStatus(snap.data() as any);
+            }
+        });
+        return () => unsubApi();
     }, []);
 
     const toggleStatus = async (id: string, currentStatus: string) => {
@@ -48,6 +60,33 @@ export default function Admin() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
                 Vista protegida. Haz clic en el estado de cualquier pago para alternarlo en tiempo real entre PENDIENTE y PAGADO.
             </p>
+
+            {/* CONTADOR API */}
+            {apiStatus && (
+                <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: 'rgba(0, 240, 255, 0.05)',
+                    border: '1px solid rgba(0, 240, 255, 0.2)',
+                    borderRadius: '12px',
+                    padding: '0.75rem 1.25rem',
+                    marginBottom: '2rem'
+                }}>
+                    <Wifi size={16} color="#00F0FF" />
+                    <div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Requests diarias a la API</span>
+                        <span style={{ fontWeight: 800, color: '#00F0FF' }}>
+                            {apiStatus.requests_current.toLocaleString()} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/ {apiStatus.requests_limit.toLocaleString()}</span>
+                        </span>
+                    </div>
+                    {apiStatus.last_updated && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                            🕐 {new Date(apiStatus.last_updated.toDate()).toLocaleTimeString('es-CO')}
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* PANEL DE SOLICITUDES DE CANCELACIÓN */}
             {cancellationRequests.length > 0 && (

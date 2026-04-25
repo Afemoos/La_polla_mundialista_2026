@@ -23,7 +23,20 @@ LEAGUES_TO_CHECK = [
 ]
 COLOMBIA_TEAM_ID = 8
 
-def fetch_predictions(fixture_id):
+def update_api_status(db, response_headers):
+    if 'x-ratelimit-requests-current' in response_headers:
+        current_req = response_headers['x-ratelimit-requests-current']
+        limit_req = response_headers.get('x-ratelimit-requests-limit', '7500')
+        try:
+            db.collection("system").document("api_status").set({
+                "requests_current": int(current_req),
+                "requests_limit": int(limit_req),
+                "last_updated": firestore.SERVER_TIMESTAMP
+            }, merge=True)
+        except Exception as e:
+            print(f"Error actualizando api_status: {e}")
+
+def fetch_predictions(fixture_id, db=None):
     print(f"Obteniendo probabilidades para el partido {fixture_id}...")
     pred_url = f"https://v3.football.api-sports.io/predictions?fixture={fixture_id}"
     time.sleep(0.5) # Prevención de Rate Limit (R/S)
@@ -34,6 +47,7 @@ def fetch_predictions(fixture_id):
     prob_away = 34
     
     if pred_response.status_code == 200:
+        if db: update_api_status(db, pred_response.headers)
         pred_data = pred_response.json()
         if pred_data.get("response") and len(pred_data["response"]) > 0:
             percents = pred_data["response"][0]["predictions"]["percent"]
@@ -65,12 +79,27 @@ def main():
 
     # --- 1. BUSCAR PARTIDO GLOBAL (MUNDIAL/CHAMPIONS) ---
     upcoming_fixtures = []
+    db = None
+    try:
+        credentials_path = CREDENTIALS_FILE if os.path.exists(CREDENTIALS_FILE) else f"../{CREDENTIALS_FILE}"
+        if "GCP_CREDENTIALS" in os.environ:
+            creds_dict = json.loads(os.environ["GCP_CREDENTIALS"])
+            firebase_creds = credentials.Certificate(creds_dict)
+        else:
+            firebase_creds = credentials.Certificate(credentials_path)
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(firebase_creds)
+        db = firestore.client()
+    except Exception as e:
+        print("Fallo conexion DB temporal", e)
+        
     for league in LEAGUES_TO_CHECK:
         print(f"Buscando el próximo partido para la liga: {league['name']}...")
         url = f"https://v3.football.api-sports.io/fixtures?league={league['id']}&season={league['season']}&next=1"
         time.sleep(0.5) # Prevención de Rate Limit (R/S)
         response = requests.get(url, headers=HEADERS)
         if response.status_code == 200:
+            if db: update_api_status(db, response.headers)
             data = response.json()
             if data.get("errors") and "plan" in data["errors"]:
                 print(f"  [ALERTA DE PAGO] API-Football bloqueó la consulta: {data['errors']['plan']}")
@@ -87,7 +116,7 @@ def main():
     if upcoming_fixtures:
         upcoming_fixtures.sort(key=lambda x: x["fixture"]["timestamp"])
         next_match = upcoming_fixtures[0]
-        h, d, a = fetch_predictions(next_match["fixture"]["id"])
+        h, d, a = fetch_predictions(next_match["fixture"]["id"], db)
         radar_match_global = build_radar_obj(next_match, h, d, a)
 
     # --- 2. BUSCAR PARTIDO DE COLOMBIA ---
@@ -97,13 +126,14 @@ def main():
     time.sleep(0.5) # Prevención de Rate Limit (R/S)
     response_col = requests.get(url_col, headers=HEADERS)
     if response_col.status_code == 200:
+        if db: update_api_status(db, response_col.headers)
         data_col = response_col.json()
         if data_col.get("errors") and "plan" in data_col["errors"]:
             print(f"  [ALERTA DE PAGO] API-Football bloqueó la consulta de equipo: {data_col['errors']['plan']}")
         elif data_col.get("response") and len(data_col["response"]) > 0:
             col_match = data_col["response"][0]
             print(f"  Encontrado: {col_match['teams']['home']['name']} vs {col_match['teams']['away']['name']}")
-            h, d, a = fetch_predictions(col_match["fixture"]["id"])
+            h, d, a = fetch_predictions(col_match["fixture"]["id"], db)
             radar_match_colombia = build_radar_obj(col_match, h, d, a)
         else:
             print("  No hay partidos próximos para Colombia.")
@@ -113,18 +143,9 @@ def main():
     # --- 3. GUARDAR EN FIRESTORE ---
     print("\nConectando a Firebase Firestore...")
     try:
-        # Intenta usar la ruta segura si el archivo falta en la raiz
-        credentials_path = CREDENTIALS_FILE if os.path.exists(CREDENTIALS_FILE) else f"../{CREDENTIALS_FILE}"
-
-        if "GCP_CREDENTIALS" in os.environ:
-            creds_dict = json.loads(os.environ["GCP_CREDENTIALS"])
-            firebase_creds = credentials.Certificate(creds_dict)
-        else:
-            firebase_creds = credentials.Certificate(credentials_path)
-
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(firebase_creds)
-        db = firestore.client()
+        # DB ya instanciada arriba
+        if not db:
+            db = firestore.client()
 
         if radar_match_global:
             print("Actualizando el documento system/radar_match...")
