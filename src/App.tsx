@@ -21,8 +21,8 @@ function App() {
           <h1>🏆 La Polla Mundialista</h1>
           <p>Predice, compite y gana con tus amigos</p>
           <button className="google-btn" onClick={authContext?.loginWithGoogle}>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" />
-            Iniciar Sesión con Google
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{ width: '24px', height: '24px' }} />
+            Iniciar sesión
           </button>
         </div>
       </div>

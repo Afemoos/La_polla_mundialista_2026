@@ -43,7 +43,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           onClick={handleLinkClick}
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
-          <Star size={20} /> Podio Ganadores
+          <Star size={20} /> Podio ganadores
         </NavLink>
 
 
@@ -52,7 +52,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           onClick={handleLinkClick}
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
-          <ListChecks size={20} /> Mis Apuestas
+          <ListChecks size={20} /> Mis apuestas
         </NavLink>
 
         {authCounter?.isAdmin && (
