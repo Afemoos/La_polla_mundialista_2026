@@ -6,8 +6,8 @@ import { db } from '../firebase';
 
 function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, matchData: any, icon: any, color: string }) {
     const { currentUser } = useAuth() || {};
-    const [scoreHome, setScoreHome] = useState(0);
-    const [scoreAway, setScoreAway] = useState(0);
+    const [scoreHome, setScoreHome] = useState<number | string>('');
+    const [scoreAway, setScoreAway] = useState<number | string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!matchData) {
@@ -41,8 +41,8 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 timestamp: serverTimestamp()
             });
             alert("✅ Predicción enviada exitosamente. Contacta al Admin para confirmar tu pago.");
-            setScoreHome(0);
-            setScoreAway(0);
+            setScoreHome('');
+            setScoreAway('');
         } catch (error: any) {
             alert("Error al enviar predicción: " + error.message);
         }
@@ -114,7 +114,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                                 min="0" 
                                 max="20"
                                 value={scoreHome}
-                                onChange={(e) => setScoreHome(Number(e.target.value))}
+                                onChange={(e) => setScoreHome(e.target.value === '' ? '' : Number(e.target.value))}
                                 required
                             />
                         </div>
@@ -127,7 +127,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                                 min="0" 
                                 max="20"
                                 value={scoreAway}
-                                onChange={(e) => setScoreAway(Number(e.target.value))}
+                                onChange={(e) => setScoreAway(e.target.value === '' ? '' : Number(e.target.value))}
                                 required
                             />
                         </div>
