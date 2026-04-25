@@ -43,6 +43,16 @@ service cloud.firestore {
         request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
     }
 
+    match /system/recent_results {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo escribe el bot via Admin SDK
+    }
+
+    match /system/api_status {
+      allow read: if isAdmin();
+      allow write: if false; // Solo escribe el bot via Admin SDK
+    }
+
     match /predictions/{predictionId} {
       allow read: if isAuthenticated();
 
