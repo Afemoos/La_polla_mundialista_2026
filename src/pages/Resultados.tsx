@@ -21,6 +21,7 @@ interface ResultPanel {
     color: string;
     matches: MatchResult[];
     loading: boolean;
+    emptyMessage?: string;
 }
 
 function MatchCard({ match }: { match: MatchResult }) {
@@ -75,7 +76,7 @@ function MatchCard({ match }: { match: MatchResult }) {
     );
 }
 
-function ResultsSection({ title, icon: Icon, color, matches, loading }: ResultPanel) {
+function ResultsSection({ title, icon: Icon, color, matches, loading, emptyMessage }: ResultPanel) {
     return (
         <div className="glass-card" style={{ border: `1px solid ${color}33` }}>
             <h3 style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', color }}>
@@ -87,7 +88,7 @@ function ResultsSection({ title, icon: Icon, color, matches, loading }: ResultPa
                 </p>
             ) : matches.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
-                    No hay resultados disponibles aún. El bot sincroniza cada 6 horas.
+                    {emptyMessage || 'No hay resultados disponibles aún. El bot sincroniza cada 6 horas.'}
                 </p>
             ) : (
                 <div>
@@ -156,6 +157,7 @@ export default function Resultados() {
                 color="#00FF88"
                 matches={worldcupMatches}
                 loading={loading}
+                emptyMessage="La fase de grupos del Mundial 2026 aún no ha comenzado. Los partidos iniciarán en junio de 2026."
             />
         </div>
     );

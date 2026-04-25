@@ -17,9 +17,11 @@ HEADERS = {
 }
 
 # IDs
-COLOMBIA_TEAM_ID = 16  # ID de Colombia
+COLOMBIA_TEAM_ID = 8   # Colombia (mismo ID que fetch_matches.py)
 CHAMPIONS_LEAGUE_ID = 2  # UEFA Champions League
 WORLD_CUP_ID = 1  # FIFA World Cup
+WORLD_CUP_SEASON = 2026  # Temporada del Mundial
+CHAMPIONS_SEASON = 2025  # Temporada Champions
 
 def update_api_status(db, response_headers):
     """Extrae las cabeceras de rate limit y las guarda en Firestore."""
@@ -43,7 +45,8 @@ def get_recent_matches(league_or_team, is_team=False):
     if is_team:
         url = f"https://v3.football.api-sports.io/fixtures?team={league_or_team}&last=10&status=FT-AET-PEN"
     else:
-        url = f"https://v3.football.api-sports.io/fixtures?league={league_or_team}&last=10&status=FT-AET-PEN"
+        season = WORLD_CUP_SEASON if league_or_team == WORLD_CUP_ID else CHAMPIONS_SEASON
+        url = f"https://v3.football.api-sports.io/fixtures?league={league_or_team}&season={season}&last=10&status=FT-AET-PEN"
         
     time.sleep(0.5)
     response = requests.get(url, headers=HEADERS)
