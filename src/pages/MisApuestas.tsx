@@ -19,6 +19,14 @@ export default function MisApuestas() {
             querySnapshot.forEach((doc) => {
                 betsArray.push({ id: doc.id, ...doc.data() } as Prediction);
             });
+            
+            // Ordenamiento local para evitar la necesidad de un Composite Index en Firestore
+            betsArray.sort((a, b) => {
+                const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
+                const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
+                return timeB - timeA;
+            });
+            
             setBets(betsArray);
         });
 

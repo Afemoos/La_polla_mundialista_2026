@@ -14,8 +14,7 @@ import type { Prediction, RadarMatch } from '../types/firestore';
 export function getUserBetsQuery(email: string) {
   return query(
     collection(db, 'predictions'),
-    where('email', '==', email),
-    orderBy('timestamp', 'desc')
+    where('email', '==', email)
   );
 }
 
