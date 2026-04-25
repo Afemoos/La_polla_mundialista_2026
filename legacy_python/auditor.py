@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
@@ -21,6 +22,7 @@ def check_match_status(fixture_id):
     Retorna (is_finished, final_score)
     """
     url = f"https://v3.football.api-sports.io/fixtures?id={fixture_id}"
+    time.sleep(0.5) # Prevención de Rate Limit (R/S)
     response = requests.get(url, headers=HEADERS)
     if response.status_code == 200:
         data = response.json()

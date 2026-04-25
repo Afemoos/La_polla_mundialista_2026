@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
@@ -25,6 +26,7 @@ COLOMBIA_TEAM_ID = 8
 def fetch_predictions(fixture_id):
     print(f"Obteniendo probabilidades para el partido {fixture_id}...")
     pred_url = f"https://v3.football.api-sports.io/predictions?fixture={fixture_id}"
+    time.sleep(0.5) # Prevención de Rate Limit (R/S)
     pred_response = requests.get(pred_url, headers=HEADERS)
     
     prob_home = 33
@@ -66,6 +68,7 @@ def main():
     for league in LEAGUES_TO_CHECK:
         print(f"Buscando el próximo partido para la liga: {league['name']}...")
         url = f"https://v3.football.api-sports.io/fixtures?league={league['id']}&season={league['season']}&next=1"
+        time.sleep(0.5) # Prevención de Rate Limit (R/S)
         response = requests.get(url, headers=HEADERS)
         if response.status_code == 200:
             data = response.json()
@@ -91,6 +94,7 @@ def main():
     print("\nBuscando el próximo partido para Colombia...")
     radar_match_colombia = None
     url_col = f"https://v3.football.api-sports.io/fixtures?team={COLOMBIA_TEAM_ID}&next=1"
+    time.sleep(0.5) # Prevención de Rate Limit (R/S)
     response_col = requests.get(url_col, headers=HEADERS)
     if response_col.status_code == 200:
         data_col = response_col.json()
