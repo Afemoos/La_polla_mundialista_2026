@@ -4,7 +4,7 @@ export interface Prediction {
   type?: string;
   matchDetails?: string;
   prediction?: string;
-  status: 'PENDIENTE' | 'PAGADO';
+  status: 'PENDIENTE' | 'PAGADO' | 'CANCELACION_SOLICITADA' | 'CANCELADA';
   timestamp?: any;
   result?: 'GANADOR' | 'PERDEDOR' | string | null;
 }

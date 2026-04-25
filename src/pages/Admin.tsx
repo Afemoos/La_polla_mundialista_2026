@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { getAllPredictionsQuery, togglePredictionStatus } from '../services/firestore';
+import { getAllPredictionsQuery, togglePredictionStatus, resolveCancellation } from '../services/firestore';
 import type { Prediction } from '../types/firestore';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
@@ -30,6 +30,16 @@ export default function Admin() {
         }
     };
 
+    const handleResolveCancel = async (id: string, approved: boolean) => {
+        try {
+            await resolveCancellation(id, approved);
+        } catch (error) {
+            console.error("Error resolving cancellation", error);
+        }
+    };
+
+    const cancellationRequests = allBets.filter(b => b.status === 'CANCELACION_SOLICITADA');
+
     // Eliminado: handleResolveMatch ya no es necesario porque auditor.py lo hace automáticamente
     return (
         <div className="fade-in">
@@ -38,6 +48,54 @@ export default function Admin() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
                 Vista protegida. Haz clic en el estado de cualquier pago para alternarlo en tiempo real entre PENDIENTE y PAGADO.
             </p>
+
+            {/* PANEL DE SOLICITUDES DE CANCELACIÓN */}
+            {cancellationRequests.length > 0 && (
+                <div className="glass-card" style={{ borderColor: 'rgba(255, 51, 102, 0.5)' }}>
+                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: '#FF3366' }}>
+                        <XCircle size={20} /> Solicitudes de Cancelación Pendientes
+                    </h3>
+                    
+                    <div className="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Evento</th>
+                                    <th>Marcador</th>
+                                    <th>Acción Requerida</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {cancellationRequests.map((bet) => (
+                                    <tr key={bet.id}>
+                                        <td style={{ fontWeight: 600 }}>{bet.email}</td>
+                                        <td>{bet.matchDetails || bet.type}</td>
+                                        <td>{bet.prediction}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button 
+                                                    onClick={() => handleResolveCancel(bet.id!, true)}
+                                                    className="btn-danger-small"
+                                                >
+                                                    Aprobar Cancelación
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleResolveCancel(bet.id!, false)}
+                                                    className="btn-primary"
+                                                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto' }}
+                                                >
+                                                    Denegar
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* PANEL ÚNICO PARA ADMINISTRADORES */}
             <div className="glass-card">

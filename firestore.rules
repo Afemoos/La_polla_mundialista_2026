@@ -54,8 +54,18 @@ service cloud.firestore {
         request.resource.data.status == 'PENDIENTE' &&
         (!('result' in request.resource.data) || request.resource.data.result == null);
 
-      allow update: if isAdmin();
-      allow delete: if false;
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.email == request.auth.token.email &&
+        resource.data.status == 'PAGADO' &&
+        request.resource.data.status == 'CANCELACION_SOLICITADA'
+      );
+      
+      allow delete: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.email == request.auth.token.email &&
+        resource.data.status == 'PENDIENTE'
+      );
     }
   }
 }

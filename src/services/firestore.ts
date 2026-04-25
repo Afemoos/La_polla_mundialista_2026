@@ -7,6 +7,7 @@ import {
   updateDoc,
   setDoc,
   serverTimestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Prediction, RadarMatch } from '../types/firestore';
@@ -62,4 +63,17 @@ export async function resolveMatchResults(
     audited: pendingBets.length,
     winners: countWinners,
   };
+}
+
+export async function deleteUserBet(id: string) {
+  await deleteDoc(doc(db, 'predictions', id));
+}
+
+export async function requestBetCancellation(id: string) {
+  await updateDoc(doc(db, 'predictions', id), { status: 'CANCELACION_SOLICITADA' });
+}
+
+export async function resolveCancellation(id: string, approved: boolean) {
+  const newStatus = approved ? 'CANCELADA' : 'PAGADO';
+  await updateDoc(doc(db, 'predictions', id), { status: newStatus });
 }
