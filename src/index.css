@@ -419,6 +419,14 @@ tr:hover td {
 }
 
 @media (max-width: 480px) {
+  .login-card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .login-card h1 {
+    font-size: 1.8rem;
+  }
+
   .glass-card {
     padding: 1.5rem 1rem;
   }
