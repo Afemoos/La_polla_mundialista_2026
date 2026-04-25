@@ -119,11 +119,13 @@ export default function MisApuestas() {
                                         </td>
                                         <td>
                                             {!bet.result && <span style={{ color: 'var(--text-muted)' }}>⏱️ En Juego</span>}
-                                            {bet.result === 'GANADOR' && <span style={{ color: '#00FF88', fontWeight: 800 }}>🏆 GANADOR</span>}
-                                            {bet.result === 'PERDEDOR' && <span style={{ color: '#FF3366', fontWeight: 800 }}>💀 Perdedor</span>}
+                                            {bet.result === 'GANADA' && <span style={{ color: '#00FF88', fontWeight: 800 }}>🏆 GANADA</span>}
+                                            {bet.result === 'PERDIDA' && <span style={{ color: '#FF3366', fontWeight: 800 }}>💀 PERDIDA</span>}
                                         </td>
                                         <td>
-                                            {bet.status === 'PENDIENTE' && (
+                                            {!bet.result && (
+                                                <>
+                                                    {bet.status === 'PENDIENTE' && (
                                                 <button 
                                                     onClick={() => handleDelete(bet.id!)}
                                                     className="btn-danger-small"
@@ -143,6 +145,8 @@ export default function MisApuestas() {
                                             )}
                                             {bet.status === 'CANCELACION_SOLICITADA' && (
                                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>En revisión...</span>
+                                            )}
+                                                </>
                                             )}
                                         </td>
                                     </tr>

@@ -113,8 +113,8 @@ def main():
                 winners = 0
                 for bet in bets:
                     bet_ref = db.collection("predictions").document(bet["id"])
-                    is_winner = "GANADOR" if bet["prediction"] == final_score else "PERDEDOR"
-                    if is_winner == "GANADOR":
+                    is_winner = "GANADA" if bet["prediction"] == final_score else "PERDIDA"
+                    if is_winner == "GANADA":
                         winners += 1
                     batch.update(bet_ref, {"result": is_winner})
                 

@@ -58,13 +58,15 @@ service cloud.firestore {
         isAuthenticated() &&
         request.resource.data.email == request.auth.token.email &&
         resource.data.status == 'PAGADO' &&
-        request.resource.data.status == 'CANCELACION_SOLICITADA'
+        request.resource.data.status == 'CANCELACION_SOLICITADA' &&
+        (!('result' in resource.data) || resource.data.result == null)
       );
       
       allow delete: if isAdmin() || (
         isAuthenticated() &&
         resource.data.email == request.auth.token.email &&
-        resource.data.status == 'PENDIENTE'
+        resource.data.status == 'PENDIENTE' &&
+        (!('result' in resource.data) || resource.data.result == null)
       );
     }
   }

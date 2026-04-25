@@ -22,7 +22,7 @@ export function getUserBetsQuery(email: string) {
 export function getWinnersQuery() {
   return query(
     collection(db, 'predictions'),
-    where('result', '==', 'GANADOR'),
+    where('result', '==', 'GANADA'),
     orderBy('timestamp', 'desc')
   );
 }
@@ -53,8 +53,8 @@ export async function resolveMatchResults(
 
   await Promise.all(
     pendingBets.map(async (bet) => {
-      const isWinner = bet.prediction === finalMarker ? 'GANADOR' : 'PERDEDOR';
-      if (isWinner === 'GANADOR') countWinners++;
+      const isWinner = bet.prediction === finalMarker ? 'GANADA' : 'PERDIDA';
+      if (isWinner === 'GANADA') countWinners++;
       await updateDoc(doc(db, 'predictions', bet.id!), { result: isWinner });
     })
   );

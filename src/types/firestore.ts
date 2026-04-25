@@ -6,7 +6,7 @@ export interface Prediction {
   prediction?: string;
   status: 'PENDIENTE' | 'PAGADO' | 'CANCELACION_SOLICITADA' | 'CANCELADA';
   timestamp?: any;
-  result?: 'GANADOR' | 'PERDEDOR' | string | null;
+  result?: 'GANADA' | 'PERDIDA' | string | null;
 }
 
 export interface RadarMatch {
