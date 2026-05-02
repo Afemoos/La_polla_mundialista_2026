@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ShieldAlert, Activity, Calendar, Zap, Globe2 } from 'lucide-react';
-import { doc, onSnapshot, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ShieldAlert, Activity, Calendar, Globe2 } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, matchData: any, icon: any, color: string }) {
-    const { currentUser } = useAuth() || {};
-    const [scoreHome, setScoreHome] = useState<number | string>('');
-    const [scoreAway, setScoreAway] = useState<number | string>('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
     if (!matchData) {
         return (
             <div className="glass-card" style={{ marginTop: '2rem' }}>
@@ -20,36 +15,6 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
             </div>
         );
     }
-
-    const submitPrediction = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const isConfirmed = window.confirm(
-            `¿Estás seguro de tu marcador exacto para el partido ${matchData.teams.home.name} vs ${matchData.teams.away.name}?\n\n` + 
-            "Una vez enviada la predicción, no podrás modificarla. Para cualquier corrección deberás contactar al Administrador."
-        );
-        if (!isConfirmed) return;
-
-        setIsSubmitting(true);
-        try {
-            await addDoc(collection(db, "predictions"), {
-                email: currentUser?.email,
-                type: "POLla_MUNDIALISTA",
-                fixtureId: matchData.fixtureId || null,
-                matchDetails: `${matchData.teams.home.name} vs ${matchData.teams.away.name}`,
-                prediction: `${scoreHome} - ${scoreAway}`,
-                homeLogo: matchData.teams.home.logo,
-                awayLogo: matchData.teams.away.logo,
-                status: "PENDIENTE",
-                timestamp: serverTimestamp()
-            });
-            alert("✅ Predicción enviada exitosamente. Contacta al Admin para confirmar tu pago.");
-            setScoreHome('');
-            setScoreAway('');
-        } catch (error: any) {
-            alert("Error al enviar predicción: " + error.message);
-        }
-        setIsSubmitting(false);
-    };
 
     return (
         <div style={{ marginTop: '2rem' }}>
@@ -97,48 +62,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 </div>
             </div>
 
-            {/* ZONA DE APUESTA */}
-            <div className="glass-card" style={{ marginTop: '1rem', border: '1px solid var(--primary)' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', marginBottom: '1rem' }}>
-                    <Zap size={20} /> Participar en este Evento
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                    Acierta el marcador exacto para llevarte el acumulado.
-                </p>
-                
-                <form onSubmit={submitPrediction}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                        <div style={{ flex: '1 1 40%', minWidth: '100px' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.home.name}</label>
-                            <input 
-                                type="number" 
-                                className="styled-input" 
-                                min="0" 
-                                max="20"
-                                value={scoreHome}
-                                onChange={(e) => setScoreHome(e.target.value === '' ? '' : Number(e.target.value))}
-                                required
-                            />
-                        </div>
-                        <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-muted)' }}>-</div>
-                        <div style={{ flex: '1 1 40%', minWidth: '100px' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Goles {matchData.teams.away.name}</label>
-                            <input 
-                                type="number" 
-                                className="styled-input" 
-                                min="0" 
-                                max="20"
-                                value={scoreAway}
-                                onChange={(e) => setScoreAway(e.target.value === '' ? '' : Number(e.target.value))}
-                                required
-                            />
-                        </div>
-                    </div>
-                    <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={isSubmitting}>
-                        {isSubmitting ? 'Registrando apuesta...' : 'Enviar Marcador Cerrado'}
-                    </button>
-                </form>
-            </div>
+            {/* AI-NOTE: Zona de apuesta temporalmente deshabilitada */}
         </div>
     );
 }
