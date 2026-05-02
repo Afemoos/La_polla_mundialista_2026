@@ -3,7 +3,7 @@ import { onSnapshot, doc, collection, updateDoc, increment, setDoc } from 'fireb
 import { db } from '../firebase';
 import { getAllPredictionsQuery, togglePredictionStatus, resolveCancellation } from '../services/firestore';
 import type { Prediction, AppUser } from '../types/firestore';
-import { CheckCircle, XCircle, Wifi, Coins, Plus, Minus, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Wifi, Coins, Plus, Minus, RefreshCw, Eye } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
@@ -11,6 +11,7 @@ export default function Admin() {
     const [users, setUsers] = useState<AppUser[]>([]);
     const [tokenAmounts, setTokenAmounts] = useState<Record<string, number>>({});
     const [syncing, setSyncing] = useState(false);
+    const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null);
 
     // Solo retenemos los estados y lógica de control de ingresos
 
@@ -288,12 +289,13 @@ export default function Admin() {
                                 <th>Usuario</th>
                                 <th>Tokens Actuales</th>
                                 <th>Acción</th>
+                                <th>Pred.</th>
                             </tr>
                         </thead>
                         <tbody>
                             {users.length === 0 ? (
                                 <tr>
-                                    <td colSpan={3} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td>
+                                    <td colSpan={4} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td>
                                 </tr>
                             ) : users.map((user) => (
                                 <tr key={user.uid}>
@@ -340,12 +342,98 @@ export default function Admin() {
                                             </button>
                                         </div>
                                     </td>
+                                    <td>
+                                        <button
+                                            onClick={() => setSelectedUserEmail(user.email)}
+                                            className="btn-primary"
+                                            style={{ padding: '6px 10px', fontSize: '0.8rem', width: 'auto', background: 'var(--glass-bg)', border: '1px solid var(--accent-bl)', color: 'var(--accent-bl)' }}
+                                            title="Ver predicciones"
+                                        >
+                                            <Eye size={14} />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {/* MODAL: PREDICCIONES DEL USUARIO */}
+            {selectedUserEmail && (
+                <div className="glass-card" style={{ marginTop: '2rem', borderColor: 'var(--accent-bl)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-bl)', margin: 0 }}>
+                            <Eye size={20} /> Predicciones de {selectedUserEmail}
+                        </h3>
+                        <button
+                            onClick={() => setSelectedUserEmail(null)}
+                            className="btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', width: 'auto', background: 'var(--glass-bg)', border: '1px solid var(--text-muted)', color: 'var(--text-muted)' }}
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+
+                    <div className="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Partido</th>
+                                    <th>Marcador</th>
+                                    <th>Tokens</th>
+                                    <th>Estado</th>
+                                    <th>Tiempo Restante</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {allBets.filter(b => b.email === selectedUserEmail && b.type === 'POLla_MUNDIALISTA').length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay predicciones registradas en la Polla Mundialista</td>
+                                    </tr>
+                                ) : allBets.filter(b => b.email === selectedUserEmail && b.type === 'POLla_MUNDIALISTA').map((bet) => {
+                                    const now = new Date();
+                                    const locked = bet.lockedAt?.toDate ? bet.lockedAt.toDate() : null;
+                                    const hoursLeft = locked ? 48 - ((now.getTime() - locked.getTime()) / (1000 * 60 * 60)) : -1;
+                                    const isBlocked = hoursLeft <= 0;
+
+                                    return (
+                                        <tr key={bet.id}>
+                                            <td style={{ fontWeight: 600 }}>{bet.matchDetails}</td>
+                                            <td>{bet.prediction}</td>
+                                            <td>{bet.tokenCost || 'N/A'}</td>
+                                            <td>
+                                                <span style={{
+                                                    padding: '3px 10px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 700,
+                                                    background: isBlocked ? 'var(--color-danger-bg)' : 'var(--color-success-bg)',
+                                                    color: isBlocked ? 'var(--color-danger)' : 'var(--color-success)',
+                                                    border: `1px solid ${isBlocked ? 'var(--color-danger)' : 'var(--color-success)'}`
+                                                }}>
+                                                    {isBlocked ? 'Bloqueado' : 'Activo'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {locked === null ? (
+                                                    <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                                ) : isBlocked ? (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Bloqueado</span>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>
+                                                        {Math.floor(hoursLeft)}h {Math.floor((hoursLeft % 1) * 60)}m
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

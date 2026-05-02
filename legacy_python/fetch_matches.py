@@ -71,102 +71,162 @@ def build_radar_obj(fixture, prob_home, prob_draw, prob_away):
         "probAway": prob_away,
     }
 
+def get_team_logo(team_name, cache):
+    """Obtiene el ID y logo de un equipo desde la API de Teams o un diccionario en caché."""
+    if team_name in cache:
+        return cache[team_name]
+    
+    # AI-NOTE: IDs conocidos de equipos nacionales de API-Football para evitar consultas extra
+    KNOWN_IDS = {
+        "México": 16, "Mexico": 16,
+        "Sudáfrica": 13, "South Africa": 13,
+        "Brasil": 6, "Brazil": 6,
+        "Marruecos": 31, "Morocco": 31,
+        "Países Bajos": 1118, "Netherlands": 1118,
+        "Japón": 12, "Japan": 12,
+        "Inglaterra": 10, "England": 10,
+        "Croacia": 3, "Croatia": 3,
+        "Colombia": 8,
+        "Argentina": 9,
+        "Austria": 775,
+        "Portugal": 27,
+        "RD Congo": 1112, "Democratic Republic of Congo": 1112, "DR Congo": 1112,
+        "Escocia": 1091, "Scotland": 1091,
+        "Ecuador": 2382,
+        "Alemania": 25, "Germany": 25,
+        "Francia": 2, "France": 2,
+        "Uruguay": 7,
+        "España": 14, "Spain": 14,
+        "Uzbekistán": 146, "Uzbekistan": 146,
+        "Noruega": 213, "Norway": 213,
+    }
+    
+    team_id = KNOWN_IDS.get(team_name)
+    if team_id:
+        logo = f"https://media.api-sports.io/football/teams/{team_id}.png"
+        cache[team_name] = (team_id, logo)
+        return (team_id, logo)
+    
+    # Si no está en el diccionario, consultar la API de Teams
+    search_url = f"https://v3.football.api-sports.io/teams?search={team_name}"
+    time.sleep(0.5)
+    response = requests.get(search_url, headers=HEADERS)
+    if response.status_code == 200:
+        data = response.json()
+        teams = data.get("response", [])
+        if teams:
+            team = teams[0]["team"]
+            team_id = team["id"]
+            logo = team["logo"]
+            cache[team_name] = (team_id, logo)
+            print(f"    Equipo encontrado vía API: {team['name']} (ID: {team_id})")
+            return (team_id, logo)
+    
+    cache[team_name] = (None, "")
+    return (None, "")
+
 def fetch_worldcup_path(db):
-    """Consulta todos los partidos de Colombia (team 8) en el Mundial (league 1)
-    y actualiza system/worldcup_path en Firestore."""
-    print("\n--- Buscando ruta mundialista de Colombia (Fase de Grupos) ---")
-    url = f"https://v3.football.api-sports.io/fixtures?team={COLOMBIA_TEAM_ID}&league=1&season=2026"
+    """Construye la ruta de 13 partidos del Mundial 2026 para system/worldcup_path.
+    Intenta obtener datos de API-Football (fixtures). Si no existen aún, usa fechas
+    manuales y busca logos vía la API de Teams o diccionario de IDs conocidos."""
+    print("\n--- Construyendo ruta mundialista (13 partidos) ---")
+
+    # Los 13 partidos objetivo con fechas exactas y costo en tokens
+    TARGET_MATCHES = [
+        ("wc-01", "México", "Sudáfrica", "2026-06-11T17:00:00-05:00", 1),
+        ("wc-02", "Brasil", "Marruecos", "2026-06-13T17:00:00-05:00", 1),
+        ("wc-03", "Países Bajos", "Japón", "2026-06-14T17:00:00-05:00", 1),
+        ("wc-04", "Inglaterra", "Croacia", "2026-06-17T17:00:00-05:00", 2),
+        ("wc-05", "Colombia", "Uzbekistán", "2026-06-17T22:00:00-05:00", 2),
+        ("wc-06", "Argentina", "Austria", "2026-06-22T17:00:00-05:00", 3),
+        ("wc-07", "Portugal", "Uzbekistán", "2026-06-23T17:00:00-05:00", 3),
+        ("wc-08", "Colombia", "RD Congo", "2026-06-23T22:00:00-05:00", 3),
+        ("wc-09", "Escocia", "Brasil", "2026-06-24T17:00:00-05:00", 4),
+        ("wc-10", "Ecuador", "Alemania", "2026-06-25T17:00:00-05:00", 4),
+        ("wc-11", "Noruega", "Francia", "2026-06-26T17:00:00-05:00", 4),
+        ("wc-12", "Uruguay", "España", "2026-06-26T22:00:00-05:00", 4),
+        ("wc-13", "Colombia", "Portugal", "2026-06-27T19:30:00-05:00", 5),
+    ]
+
+    # Intentar obtener fixtures reales del Mundial 2026
+    api_fixtures = {}
+    print("  Consultando fixtures del Mundial 2026 en API-Football...")
+    url = "https://v3.football.api-sports.io/fixtures?league=1&season=2026"
     time.sleep(0.5)
     response = requests.get(url, headers=HEADERS)
-
-    if response.status_code != 200:
-        print(f"  Error consultando ruta mundialista: {response.text}")
-        return
 
     if db:
         update_api_status(db, response.headers)
 
-    data = response.json()
-    if data.get("errors") and "plan" in data["errors"]:
-        print(f"  [ALERTA DE PAGO] {data['errors']['plan']}")
-        return
+    if response.status_code == 200:
+        data = response.json()
+        fixtures = data.get("response", [])
+        if not data.get("errors") and fixtures:
+            print(f"  API retornó {len(fixtures)} partidos del Mundial 2026.")
+            for f in fixtures:
+                home = f["teams"]["home"]["name"]
+                away = f["teams"]["away"]["name"]
+                key = (home, away)
+                api_fixtures[key] = f
+        elif data.get("errors"):
+            print(f"  API reportó: {data['errors']}")
+    else:
+        print(f"  API no disponible. Se usarán datos manuales.")
 
-    fixtures = data.get("response", [])
-    if not fixtures:
-        print("  No se encontraron partidos de Colombia en el Mundial 2026.")
-        return
-
-    fixtures.sort(key=lambda x: x["fixture"]["timestamp"])
-
-    print(f"  Encontrados {len(fixtures)} partidos de Colombia en el Grupo K.")
-
+    logo_cache = {}
     matches = []
-    group_stage_count = 0
-    # Fases de grupos: jornadas 1, 2, 3
-    # Fases finales (dummy): octavos, cuartos, semi, final
-    phase_order = [
-        "Fase de Grupos - Jornada 1",
-        "Fase de Grupos - Jornada 2",
-        "Fase de Grupos - Jornada 3",
-        "Octavos de Final",
-        "Cuartos de Final",
-        "Semifinal",
-        "Final"
-    ]
-    token_costs = [1, 1, 1, 2, 3, 4, 5]
 
-    for i, fixture in enumerate(fixtures[:3]):  # Solo los primeros 3 (fase de grupos)
-        group_stage_count += 1
-        h, d, a = fetch_predictions(fixture["fixture"]["id"], db)
-        match_obj = {
-            "id": f"wc-grupos-{group_stage_count}",
-            "phase": phase_order[i],
-            "homeTeam": fixture["teams"]["home"]["name"],
-            "awayTeam": fixture["teams"]["away"]["name"],
-            "homeFlag": fixture["teams"]["home"]["logo"],
-            "awayFlag": fixture["teams"]["away"]["logo"],
-            "stadium": fixture["fixture"]["venue"]["name"] or "Por definir",
-            "date": fixture["fixture"]["date"],
-            "probHome": h,
-            "probDraw": d,
-            "probAway": a,
-            "tokenCost": token_costs[i],
-            "isDefined": True
-        }
+    for match_id, home_name, away_name, date_str, token_cost in TARGET_MATCHES:
+        key = (home_name, away_name)
+        fixture = api_fixtures.get(key)
+
+        if fixture:
+            h, d, a = fetch_predictions(fixture["fixture"]["id"], db)
+            match_obj = {
+                "id": match_id,
+                "fixtureId": fixture["fixture"]["id"],
+                "homeTeam": fixture["teams"]["home"]["name"],
+                "awayTeam": fixture["teams"]["away"]["name"],
+                "homeFlag": fixture["teams"]["home"]["logo"],
+                "awayFlag": fixture["teams"]["away"]["logo"],
+                "stadium": fixture["fixture"]["venue"]["name"] or "Por definir",
+                "date": fixture["fixture"]["date"],
+                "probHome": h,
+                "probDraw": d,
+                "probAway": a,
+                "tokenCost": token_cost,
+                "isDefined": True
+            }
+            print(f"  ✅ {match_id}: {home_name} vs {away_name} (API)")
+        else:
+            # Datos manuales: buscar logos vía API de Teams o diccionario
+            _, home_logo = get_team_logo(home_name, logo_cache)
+            _, away_logo = get_team_logo(away_name, logo_cache)
+            match_obj = {
+                "id": match_id,
+                "fixtureId": None,
+                "homeTeam": home_name,
+                "awayTeam": away_name,
+                "homeFlag": home_logo,
+                "awayFlag": away_logo,
+                "stadium": "Por definir",
+                "date": date_str,
+                "probHome": 33,
+                "probDraw": 33,
+                "probAway": 34,
+                "tokenCost": token_cost,
+                "isDefined": True
+            }
+            print(f"  ⚠️  {match_id}: {home_name} vs {away_name} (manual)")
+
         matches.append(match_obj)
-        print(f"    {match_obj['phase']}: {match_obj['homeTeam']} vs {match_obj['awayTeam']}")
-
-    # AI-NOTE: Tarjetas dummy para fases finales (octavos, cuartos, semi, final)
-    # Se marcan como isDefined: False hasta que se definan los clasificados
-    dummy_phases = [
-        ("Octavos de Final", "wc-octavos", 2),
-        ("Cuartos de Final", "wc-cuartos", 3),
-        ("Semifinal", "wc-semi", 4),
-        ("Final", "wc-final", 5)
-    ]
-    for phase_name, match_id, token_cost in dummy_phases:
-        matches.append({
-            "id": match_id,
-            "phase": phase_name,
-            "homeTeam": "Falta por definirse",
-            "awayTeam": "Falta por definirse",
-            "homeFlag": "",
-            "awayFlag": "",
-            "stadium": "Falta por definirse",
-            "date": "",
-            "probHome": 0,
-            "probDraw": 0,
-            "probAway": 0,
-            "tokenCost": token_cost,
-            "isDefined": False
-        })
 
     try:
         db.collection("system").document("worldcup_path").set({
             "matches": matches,
             "updatedAt": firestore.SERVER_TIMESTAMP
         })
-        print("  ✅ system/worldcup_path actualizado exitosamente.")
+        print(f"  ✅ system/worldcup_path actualizado con {len(matches)} partidos.")
     except Exception as e:
         print(f"  ❌ Error guardando worldcup_path: {e}")
 

@@ -1,47 +1,60 @@
-# Plan de Implementación: Correcciones UI y Datos de la Polla
+# Plan de Implementación: Fase 3 - Polla Mundialista (13 Partidos Oficiales y Gestión Avanzada)
 
 ## 1. Contexto y Objetivos
-Tras la implementación inicial del sistema de tokens y la interfaz de predicciones, se identificaron tres áreas de mejora inmediata que deben abordarse:
-1. **Accesibilidad Visual:** El contador de tokens en la barra lateral es ilegible en el tema claro debido al uso de un amarillo *hardcodeado*.
-2. **Precisión de Datos:** Los partidos de la fase de grupos de Colombia (Grupo K) ya están definidos y deben reflejarse por defecto en la UI.
-3. **Gestión de Administrador:** Los botones de incremento de tokens fallan silenciosamente cuando el campo de entrada está vacío, y la lista de usuarios solo muestra a aquellos que han iniciado sesión recientemente, dejando por fuera a usuarios históricos.
+Basado en el QA reciente, se detectaron áreas de mejora en el registro de apuestas (cobro de tokens), la gestión administrativa, y la lista definitiva de partidos. El objetivo de esta fase es:
+1. **Cobro correcto de tokens:** Asegurar que el frontend solo deduzca tokens una vez, permitiendo la modificación gratuita dentro de 48h, e introduciendo un botón de "Bloqueo Definitivo" (saltar espera de 48h).
+2. **Auditoría de Usuarios (Admin):** Permitir a los administradores ver el historial individual de apuestas de cada jugador, junto con el tiempo restante de su ventana de modificación.
+3. **Listado Exacto de Partidos (API-Football):** Abandonar las tarjetas "dummy" y forzar al bot de Python a sincronizar 13 partidos específicos del Mundial (definidos en Excel) consumiendo directamente de API-Football.
 
-## 2. Soluciones Técnicas
+## 2. Arquitectura de Soluciones
 
-### 2.1 UI del Contador de Tokens (`Sidebar.tsx`)
-- **Problema:** El color `#FFD700` con opacidad no hace contraste sobre fondos blancos.
-- **Solución:** Refactorizar los estilos en línea del contenedor del contador de tokens. Reemplazar los colores hexadecimales estáticos por variables CSS responsivas (ej. `var(--text-main)` o `var(--primary)`) y asegurar que el fondo se adapte (`var(--glass-bg)`).
+### 2.1 Backend / Python Bot (`legacy_python/fetch_matches.py`)
+- **Problema:** El bot actual solo busca los partidos de Colombia o usa lógica genérica.
+- **Solución:** Reestructurar la función `fetch_worldcup_path(db)` para que consulte a la API-Football todos los partidos de la `league=1` (Mundial) y `season=2026` (o utilizar los IDs de equipos específicos).
+- **El bot DEBE armar un array en `system/worldcup_path` estrictamente con estos 13 partidos:**
+  1. México vs. Sudáfrica (11 de junio)
+  2. Brasil vs. Marruecos (13 de junio)
+  3. Países Bajos vs. Japón (14 de junio)
+  4. Inglaterra vs. Croacia (17 de junio)
+  5. Colombia vs. Uzbekistán (17 de junio)
+  6. Argentina vs. Austria (22 de junio)
+  7. Portugal vs. Uzbekistán (23 de junio)
+  8. Colombia vs. RD Congo (23 de junio)
+  9. Escocia vs. Brasil (24 de junio)
+  10. Ecuador vs. Alemania (25 de junio)
+  11. Noruega vs. Francia (26 de junio)
+  12. Uruguay vs. España (26 de junio)
+  13. Colombia vs. Portugal (27 de junio)
+- **Extracción:** El bot extraerá logos, IDs de equipos y `fixtureId` de la API. *Obligatorio:* Si la API de fútbol no los retorna aún (por estar lejanos en el tiempo), el script de Python deberá usar la API de *Teams* para traer los logos de los países e insertar estos 13 registros en Firestore usando la fecha exacta indicada, garantizando que el Frontend no use datos planos locales.
+- **Documentación API-Football para el Agente:** 
+  - Host a utilizar: `v3.football.api-sports.io`
+  - *Para buscar partidos:* Endpoint `GET /fixtures`. Parámetros útiles: `?league=1&season=2026` o `?date=YYYY-MM-DD`.
+  - *Para buscar logos de países (si no hay partido):* Endpoint `GET /teams`. Parámetros útiles: `?search=Colombia` o `?name=Colombia`. Extraer de `response[0].team.logo`.
+  - *Para predicciones:* Endpoint `GET /predictions`. Parámetro: `?fixture={id}`.
 
-### 2.2 Actualización de Partidos y Automatización
-- **Problema Backend:** El script de Python `fetch_matches.py` actualmente no está configurado para poblar correctamente la ruta `system/worldcup_path` con los datos de la fase de grupos del Mundial para Colombia.
-- **Solución Backend:** Modificar `legacy_python/fetch_matches.py` para que realice una petición a API-Football filtrando por la liga 1 (Mundial), equipo 8 (Colombia), y actualice automáticamente el documento `system/worldcup_path` en Firestore.
-- **Problema Frontend (Fallback):** `DUMMY_MATCHES` en `PollaMundialista.tsx` utiliza datos genéricos cuando el bot falla o la API no responde.
-- **Solución Frontend:** Actualizar las primeras 3 tarjetas del array constante `DUMMY_MATCHES` con la información oficial como capa de seguridad:
-  - **Jornada 1:** Colombia vs Uzbekistán (17/06/2026, 10:00 p.m.)
-  - **Jornada 2:** Colombia vs RD Congo (23/06/2026, 10:00 p.m.)
-  - **Jornada 3:** Colombia vs Portugal (27/06/2026, 7:30 p.m.)
-- *Nota:* Asignar `isDefined: true` a estas tres tarjetas en el fallback.
+### 2.2 Frontend / UI (`PollaMundialista.tsx`)
+- **Limpieza de Datos Planos:** Eliminar por completo el fallback local `DUMMY_MATCHES`. La vista debe renderizar exclusivamente el array `matches` proveniente de `system/worldcup_path`.
+- **Botón de Bloqueo Inmediato:** En cada tarjeta donde el usuario tenga una apuesta activa y esté dentro de las 48 horas, además del botón "Modificar", añadir un botón rojo o distintivo llamado `[Bloquear Definitivamente]`.
+  - **Lógica:** Al presionarlo, actualizar el documento en Firestore cambiando `lockedAt` a una fecha antigua (ej. restando 48h) o añadiendo un flag `isLockedManually: true`. Esto inhabilitará las modificaciones inmediatamente.
+- **Cobro de Tokens (Aclaración):** *Nota para el agente:* Las reglas de Firestore ya fueron parcheadas para permitir al usuario descontar sus propios tokens. Revisa la lógica de `handleModify` para confirmar que modificar NO resta tokens nuevamente.
 
-
-### 2.3 Panel de Administración (`Admin.tsx`)
-- **Botones Silenciosos:** El código actual hace `if (amount <= 0) return;`. Si el administrador no escribe un número y solo presiona `+`, `amount` es 0, y la función no hace nada.
-  - **Solución:** Si el input está vacío, asumir un incremento por defecto de `1` (`const finalAmount = amount || 1;`). Añadir un pequeño `alert()` o notificación de éxito/error.
-- **Sincronización de Usuarios:** Como Firebase Auth no permite listar todos los correos directamente en el frontend, usaremos los datos históricos.
-  - **Solución:** Añadir un botón secundario llamado "Sincronizar Usuarios Antiguos". Este botón ejecutará una función que recorra el estado `allBets` (apuestas históricas), extraiga todos los correos únicos (`email`), y verifique si existen en la colección `users`. Si no existen, creará un documento para ellos con `tokens: 0` (utilizando su propio email validado como identificador o generando uno nuevo) para que aparezcan disponibles en la tabla de recargas.
+### 2.3 Panel Admin (`Admin.tsx`)
+- **Modal de Historial Individual:** En la tabla "Gestión de Tokens" (donde se listan los usuarios), añadir un botón con el icono de un "Ojo" (Ver Predicciones).
+- **Lógica:** Al hacer clic, se abrirá un Modal (o se expandirá la fila) mostrando una tabla filtrada que contenga **solo** las predicciones (`allBets`) donde `bet.email === usuario_seleccionado`.
+- **Datos a mostrar:** Partido, Predicción Actual, y Estado del Tiempo (ej. "Faltan 12 horas para bloqueo" o "Bloqueado").
 
 ---
 
 ## 3. To-Do List (Checklist de Progreso)
 *Agente: Marca con una `[x]` las tareas a medida que las vayas completando.*
 
-### Correcciones UI
-- [x] 1. **Sidebar.tsx**: Eliminar el color `#FFD700` *hardcodeado* en el contador de tokens y reemplazarlo por variables CSS que contrasten correctamente tanto en tema claro como oscuro.
+### Backend / API-Football
+- [x] 1. **fetch_matches.py**: Modificar la extracción para armar y guardar en Firestore exclusivamente los 13 partidos listados en los requerimientos. Usar la API de equipos (`/teams`) o de partidos (`/fixtures`) para poblar logos reales de API-Football. No usar arrays estáticos de fallback en el frontend.
 
-### Actualización de Datos y Automatización (Backend/Frontend)
-- [x] 2. **fetch_matches.py**: Modificar el bot de Python para que consulte la API-Football (Team 8, League 1) y actualice el array de partidos en el documento `system/worldcup_path` de Firestore.
-- [x] 3. **PollaMundialista.tsx**: Modificar la constante `DUMMY_MATCHES` (el fallback de seguridad) para incluir los nombres, fechas (17/6, 23/6, 27/6) y equipos reales del Grupo K (Uzbekistán, RD Congo, Portugal), estableciendo `isDefined: true`.
+### Frontend: Lógica de Apuestas
+- [x] 2. **PollaMundialista.tsx**: Eliminar constantes de Dummy Matches. Cargar dinámicamente desde Firebase (`worldcup_path`).
+- [x] 3. **PollaMundialista.tsx**: Añadir el botón "Bloquear Definitivamente" en las tarjetas de apuestas activas para cancelar voluntariamente el periodo de gracia de 48h.
 
-### Panel Administrativo
-- [x] 4. **Admin.tsx (Botones +/-)**: Modificar las funciones `addTokens` y `removeTokens` para que asuman `1` por defecto si el input de cantidad está vacío. Agregar un `alert("Tokens actualizados")`.
-- [x] 5. **Admin.tsx (Sincronización)**: Implementar una función `syncMissingUsers` que extraiga emails únicos de `allBets`, compruebe si están en la variable de estado `users`, y si no, ejecute escrituras por lotes (`writeBatch` o `setDoc`) en la colección `users` en Firestore.
-- [x] 6. **Admin.tsx (UI)**: Añadir un botón en la cabecera del panel de "Gestión de Tokens" para disparar la función `syncMissingUsers`.
+### Frontend: Panel de Control (Admin)
+- [x] 4. **Admin.tsx**: Añadir un botón para inspeccionar usuarios individuales en la tabla de Gestión de Tokens.
+- [x] 5. **Admin.tsx**: Crear un Modal o Vista Secundaria que muestre los 13 partidos (o predicciones hechas) del usuario seleccionado, reflejando si están bloqueados o cuánto tiempo les queda de modificación.

@@ -60,9 +60,13 @@ service cloud.firestore {
         request.resource.data.email == request.auth.token.email &&
         request.resource.data.tokens == 0) || 
         (isAdmin() && request.resource.data.tokens == 0);
-      allow update: if isAdmin() &&
+      allow update: if (isAdmin() &&
         request.resource.data.tokens is int &&
-        request.resource.data.tokens >= 0;
+        request.resource.data.tokens >= 0) ||
+        (isAuthenticated() && request.auth.uid == uid &&
+        request.resource.data.tokens is int &&
+        request.resource.data.tokens >= 0 &&
+        request.resource.data.tokens <= resource.data.tokens);
     }
 
     match /system/worldcup_path {

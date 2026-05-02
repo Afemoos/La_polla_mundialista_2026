@@ -7,7 +7,7 @@ import { Calendar, MapPin, Lock, Edit3, Save, AlertTriangle, Coins } from 'lucid
 
 interface WorldCupMatch {
   id: string;
-  phase: string;
+  fixtureId?: number;
   homeTeam?: string;
   awayTeam?: string;
   homeFlag?: string;
@@ -27,16 +27,6 @@ interface UserPredictionState {
   prediction?: string;
   lockedAt?: Date;
 }
-
-const DUMMY_MATCHES: WorldCupMatch[] = [
-  { id: 'wc-grupos-1', phase: 'Fase de Grupos - Jornada 1', homeTeam: 'Colombia', awayTeam: 'Uzbekistán', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/66.png', stadium: 'Por definir', date: '2026-06-17T22:00:00-05:00', probHome: 50, probDraw: 30, probAway: 20, tokenCost: 1, isDefined: true },
-  { id: 'wc-grupos-2', phase: 'Fase de Grupos - Jornada 2', homeTeam: 'Colombia', awayTeam: 'RD Congo', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/34.png', stadium: 'Por definir', date: '2026-06-23T22:00:00-05:00', probHome: 55, probDraw: 25, probAway: 20, tokenCost: 1, isDefined: true },
-  { id: 'wc-grupos-3', phase: 'Fase de Grupos - Jornada 3', homeTeam: 'Colombia', awayTeam: 'Portugal', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/27.png', stadium: 'Por definir', date: '2026-06-27T19:30:00-05:00', probHome: 35, probDraw: 30, probAway: 35, tokenCost: 1, isDefined: true },
-  { id: 'wc-octavos', phase: 'Octavos de Final', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 2, isDefined: false },
-  { id: 'wc-cuartos', phase: 'Cuartos de Final', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 3, isDefined: false },
-  { id: 'wc-semi', phase: 'Semifinal', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 4, isDefined: false },
-  { id: 'wc-final', phase: 'Final', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 5, isDefined: false },
-];
 
 function MatchCard({
   match,
@@ -154,10 +144,32 @@ function MatchCard({
     setIsEditing(false);
   };
 
+  const handleLockNow = async () => {
+    if (!userPrediction.docId) return;
+    const isConfirmed = window.confirm(
+      '¿Estás seguro de bloquear definitivamente tu predicción? No podrás modificarla bajo ninguna circunstancia.'
+    );
+    if (!isConfirmed) return;
+
+    setSaving(true);
+    try {
+      // AI-NOTE: Forzar bloqueo inmediato restando 49h a lockedAt
+      const pastTime = new Date(now.getTime() - 49 * 60 * 60 * 1000);
+      await updateDoc(doc(db, 'predictions', userPrediction.docId), {
+        lockedAt: pastTime
+      });
+      alert('Predicción bloqueada definitivamente.');
+    } catch (error) {
+      console.error('Error bloqueando predicción:', error);
+      alert('Error al bloquear la predicción.');
+    }
+    setSaving(false);
+  };
+
   return (
     <div className={getCardClass()}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <span className="card-phase">{match.phase}</span>
+        <span className="card-phase">{match.homeTeam} vs {match.awayTeam}</span>
         <span className="card-token-cost">
           <Coins size={14} style={{ marginRight: '4px' }} />
           {match.tokenCost} {match.tokenCost === 1 ? 'Token' : 'Tokens'}
@@ -289,6 +301,14 @@ function MatchCard({
             >
               <Edit3 size={16} style={{ marginRight: '6px' }} /> Modificar
             </button>
+            <button
+              className="btn-danger-small"
+              style={{ width: '100%', marginTop: '4px' }}
+              onClick={handleLockNow}
+              disabled={saving}
+            >
+              <Lock size={16} style={{ marginRight: '6px' }} /> Bloquear Definitivamente
+            </button>
           </div>
         )}
         {match.isDefined && canModify && isEditing && (
@@ -321,7 +341,7 @@ function MatchCard({
 
 export default function PollaMundialista() {
   const { currentUser } = useAuth() || {};
-  const [matches, setMatches] = useState<WorldCupMatch[]>(DUMMY_MATCHES);
+  const [matches, setMatches] = useState<WorldCupMatch[]>([]);
   const [userPredictions, setUserPredictions] = useState<Prediction[]>([]);
   const [userTokens, setUserTokens] = useState(0);
   const [loading, setLoading] = useState(true);
