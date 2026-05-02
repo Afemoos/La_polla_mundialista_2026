@@ -71,6 +71,105 @@ def build_radar_obj(fixture, prob_home, prob_draw, prob_away):
         "probAway": prob_away,
     }
 
+def fetch_worldcup_path(db):
+    """Consulta todos los partidos de Colombia (team 8) en el Mundial (league 1)
+    y actualiza system/worldcup_path en Firestore."""
+    print("\n--- Buscando ruta mundialista de Colombia (Fase de Grupos) ---")
+    url = f"https://v3.football.api-sports.io/fixtures?team={COLOMBIA_TEAM_ID}&league=1&season=2026"
+    time.sleep(0.5)
+    response = requests.get(url, headers=HEADERS)
+
+    if response.status_code != 200:
+        print(f"  Error consultando ruta mundialista: {response.text}")
+        return
+
+    if db:
+        update_api_status(db, response.headers)
+
+    data = response.json()
+    if data.get("errors") and "plan" in data["errors"]:
+        print(f"  [ALERTA DE PAGO] {data['errors']['plan']}")
+        return
+
+    fixtures = data.get("response", [])
+    if not fixtures:
+        print("  No se encontraron partidos de Colombia en el Mundial 2026.")
+        return
+
+    fixtures.sort(key=lambda x: x["fixture"]["timestamp"])
+
+    print(f"  Encontrados {len(fixtures)} partidos de Colombia en el Grupo K.")
+
+    matches = []
+    group_stage_count = 0
+    # Fases de grupos: jornadas 1, 2, 3
+    # Fases finales (dummy): octavos, cuartos, semi, final
+    phase_order = [
+        "Fase de Grupos - Jornada 1",
+        "Fase de Grupos - Jornada 2",
+        "Fase de Grupos - Jornada 3",
+        "Octavos de Final",
+        "Cuartos de Final",
+        "Semifinal",
+        "Final"
+    ]
+    token_costs = [1, 1, 1, 2, 3, 4, 5]
+
+    for i, fixture in enumerate(fixtures[:3]):  # Solo los primeros 3 (fase de grupos)
+        group_stage_count += 1
+        h, d, a = fetch_predictions(fixture["fixture"]["id"], db)
+        match_obj = {
+            "id": f"wc-grupos-{group_stage_count}",
+            "phase": phase_order[i],
+            "homeTeam": fixture["teams"]["home"]["name"],
+            "awayTeam": fixture["teams"]["away"]["name"],
+            "homeFlag": fixture["teams"]["home"]["logo"],
+            "awayFlag": fixture["teams"]["away"]["logo"],
+            "stadium": fixture["fixture"]["venue"]["name"] or "Por definir",
+            "date": fixture["fixture"]["date"],
+            "probHome": h,
+            "probDraw": d,
+            "probAway": a,
+            "tokenCost": token_costs[i],
+            "isDefined": True
+        }
+        matches.append(match_obj)
+        print(f"    {match_obj['phase']}: {match_obj['homeTeam']} vs {match_obj['awayTeam']}")
+
+    # AI-NOTE: Tarjetas dummy para fases finales (octavos, cuartos, semi, final)
+    # Se marcan como isDefined: False hasta que se definan los clasificados
+    dummy_phases = [
+        ("Octavos de Final", "wc-octavos", 2),
+        ("Cuartos de Final", "wc-cuartos", 3),
+        ("Semifinal", "wc-semi", 4),
+        ("Final", "wc-final", 5)
+    ]
+    for phase_name, match_id, token_cost in dummy_phases:
+        matches.append({
+            "id": match_id,
+            "phase": phase_name,
+            "homeTeam": "Falta por definirse",
+            "awayTeam": "Falta por definirse",
+            "homeFlag": "",
+            "awayFlag": "",
+            "stadium": "Falta por definirse",
+            "date": "",
+            "probHome": 0,
+            "probDraw": 0,
+            "probAway": 0,
+            "tokenCost": token_cost,
+            "isDefined": False
+        })
+
+    try:
+        db.collection("system").document("worldcup_path").set({
+            "matches": matches,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        })
+        print("  ✅ system/worldcup_path actualizado exitosamente.")
+    except Exception as e:
+        print(f"  ❌ Error guardando worldcup_path: {e}")
+
 def main():
     print("Iniciando búsqueda de próximos partidos...")
     if not API_KEY:
@@ -157,7 +256,10 @@ def main():
             radar_match_colombia["updatedAt"] = firestore.SERVER_TIMESTAMP
             db.collection("system").document("colombia_match").set(radar_match_colombia)
         
-        print("✅ ¡Ambos radares actualizados exitosamente en Firebase!")
+        # AI-NOTE: Actualizar ruta mundialista (system/worldcup_path)
+        fetch_worldcup_path(db)
+
+        print("✅ ¡Todos los radares y ruta mundialista actualizados exitosamente en Firebase!")
 
     except Exception as e:
         import traceback

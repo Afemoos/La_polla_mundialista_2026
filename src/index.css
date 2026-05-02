@@ -538,3 +538,70 @@ tr:hover td {
   margin-top: 1rem;
 }
 
+/* --- Match Cards (Polla Mundialista) --- */
+
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.match-card {
+  transition: all 0.3s ease;
+}
+
+.match-card:hover {
+  transform: translateY(-2px);
+}
+
+.match-card-locked {
+  opacity: 0.6;
+  filter: grayscale(30%);
+}
+
+.match-card-locked:hover {
+  transform: none;
+}
+
+.match-card-future {
+  opacity: 0.5;
+  border: 1px dashed var(--glass-border);
+}
+
+.match-card-future:hover {
+  transform: none;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.card-phase {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.card-token-cost {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--color-warning-bg);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--primary);
+}
+
+@media (max-width: 480px) {
+  .match-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

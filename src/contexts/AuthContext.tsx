@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { 
     GoogleAuthProvider, 
     signInWithPopup, 
     signOut, 
     onAuthStateChanged
 } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 
 interface AuthContextType {
@@ -31,10 +32,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
             if(user && user.email) {
                 setIsAdmin(ADMIN_EMAILS.includes(user.email));
+                // AI-NOTE: Registrar automáticamente al usuario en Firestore si es su primer login
+                const userDocRef = doc(db, 'users', user.uid);
+                const userSnap = await getDoc(userDocRef);
+                if (!userSnap.exists()) {
+                    await setDoc(userDocRef, {
+                        uid: user.uid,
+                        email: user.email,
+                        tokens: 0
+                    });
+                }
             } else {
                 setIsAdmin(false);
             }

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc } from 'firebase/firestore';
+import { onSnapshot, doc, collection, updateDoc, increment, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAllPredictionsQuery, togglePredictionStatus, resolveCancellation } from '../services/firestore';
-import type { Prediction } from '../types/firestore';
-import { CheckCircle, XCircle, Wifi } from 'lucide-react';
+import type { Prediction, AppUser } from '../types/firestore';
+import { CheckCircle, XCircle, Wifi, Coins, Plus, Minus, RefreshCw } from 'lucide-react';
 
 export default function Admin() {
     const [allBets, setAllBets] = useState<Prediction[]>([]);
     const [apiStatus, setApiStatus] = useState<{ requests_current: number; requests_limit: number; last_updated: any } | null>(null);
+    const [users, setUsers] = useState<AppUser[]>([]);
+    const [tokenAmounts, setTokenAmounts] = useState<Record<string, number>>({});
+    const [syncing, setSyncing] = useState(false);
 
     // Solo retenemos los estados y lógica de control de ingresos
 
@@ -34,6 +37,17 @@ export default function Admin() {
         return () => unsubApi();
     }, []);
 
+    useEffect(() => {
+        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+            const usersList: AppUser[] = [];
+            snap.forEach((d) => {
+                usersList.push({ uid: d.id, ...d.data() } as AppUser);
+            });
+            setUsers(usersList);
+        });
+        return () => unsubUsers();
+    }, []);
+
     const toggleStatus = async (id: string, currentStatus: string) => {
         try {
             await togglePredictionStatus(id, currentStatus);
@@ -51,6 +65,62 @@ export default function Admin() {
     };
 
     const cancellationRequests = allBets.filter(b => b.status === 'CANCELACION_SOLICITADA');
+
+    const addTokens = async (uid: string, amount: number) => {
+        const finalAmount = amount || 1;
+        try {
+            await updateDoc(doc(db, 'users', uid), { tokens: increment(finalAmount) });
+            setTokenAmounts(prev => ({ ...prev, [uid]: 0 }));
+            alert(`✅ Se agregaron ${finalAmount} token(s) exitosamente.`);
+        } catch (error) {
+            console.error("Error adding tokens", error);
+            alert("❌ Error al agregar tokens.");
+        }
+    };
+
+    const removeTokens = async (uid: string, amount: number) => {
+        const finalAmount = amount || 1;
+        try {
+            await updateDoc(doc(db, 'users', uid), { tokens: increment(-finalAmount) });
+            setTokenAmounts(prev => ({ ...prev, [uid]: 0 }));
+            alert(`✅ Se restaron ${finalAmount} token(s) exitosamente.`);
+        } catch (error) {
+            console.error("Error removing tokens", error);
+            alert("❌ Error al restar tokens.");
+        }
+    };
+
+    // AI-NOTE: Sincroniza usuarios históricos desde allBets a la colección users
+    const syncMissingUsers = async () => {
+        setSyncing(true);
+        try {
+            const existingEmails = new Set(users.map(u => u.email));
+            const uniqueEmails = [...new Set(allBets.map(b => b.email).filter(Boolean))] as string[];
+            let created = 0;
+
+            for (const email of uniqueEmails) {
+                if (!existingEmails.has(email)) {
+                    const docId = email.replace(/[.#$/\[\]]/g, '_');
+                    await setDoc(doc(db, 'users', docId), {
+                        uid: docId,
+                        email: email,
+                        tokens: 0
+                    });
+                    created++;
+                }
+            }
+
+            if (created > 0) {
+                alert(`✅ Se sincronizaron ${created} usuario(s) histórico(s). Aparecerán en la tabla en breve.`);
+            } else {
+                alert('Todos los usuarios históricos ya están registrados.');
+            }
+        } catch (error) {
+            console.error("Error syncing users:", error);
+            alert("❌ Error al sincronizar usuarios.");
+        }
+        setSyncing(false);
+    };
 
     // Eliminado: handleResolveMatch ya no es necesario porque auditor.py lo hace automáticamente
     return (
@@ -186,6 +256,89 @@ export default function Admin() {
                                         >
                                             {bet.status}
                                         </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* PANEL DE GESTIÓN DE TOKENS */}
+            <div className="glass-card" style={{ marginTop: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '8px' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', margin: 0 }}>
+                        <Coins size={20} /> Gestión de Tokens
+                    </h3>
+                    <button
+                        className="btn-primary"
+                        style={{ padding: '8px 16px', fontSize: '0.85rem', width: 'auto' }}
+                        onClick={syncMissingUsers}
+                        disabled={syncing}
+                    >
+                        <RefreshCw size={16} style={{ marginRight: '6px' }} />
+                        {syncing ? 'Sincronizando...' : 'Sincronizar Usuarios Antiguos'}
+                    </button>
+                </div>
+
+                <div className="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Tokens Actuales</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.length === 0 ? (
+                                <tr>
+                                    <td colSpan={3} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td>
+                                </tr>
+                            ) : users.map((user) => (
+                                <tr key={user.uid}>
+                                    <td style={{ fontWeight: 600 }}>{user.email}</td>
+                                    <td>
+                                        <span style={{
+                                            background: 'var(--glass-bg)',
+                                            padding: '6px 14px',
+                                            borderRadius: '20px',
+                                            fontWeight: 800,
+                                            color: 'var(--primary)',
+                                            fontSize: '1rem'
+                                        }}>
+                                            🪙 {user.tokens}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={tokenAmounts[user.uid] || ''}
+                                                onChange={(e) => setTokenAmounts(prev => ({
+                                                    ...prev,
+                                                    [user.uid]: e.target.value === '' ? 0 : Number(e.target.value)
+                                                }))}
+                                                placeholder="Cant."
+                                                className="styled-input"
+                                                style={{ width: '70px', padding: '6px 8px', textAlign: 'center' }}
+                                            />
+                                            <button
+                                                onClick={() => addTokens(user.uid, tokenAmounts[user.uid] || 0)}
+                                                className="btn-primary"
+                                                style={{ padding: '6px 10px', fontSize: '0.8rem', width: 'auto' }}
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => removeTokens(user.uid, tokenAmounts[user.uid] || 0)}
+                                                className="btn-danger-small"
+                                                style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                                            >
+                                                <Minus size={14} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

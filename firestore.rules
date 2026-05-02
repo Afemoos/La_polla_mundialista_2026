@@ -53,6 +53,22 @@ service cloud.firestore {
       allow write: if false; // Solo escribe el bot via Admin SDK
     }
 
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == uid &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.tokens == 0;
+      allow update: if isAdmin() &&
+        request.resource.data.tokens is int &&
+        request.resource.data.tokens >= 0;
+    }
+
+    match /system/worldcup_path {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /predictions/{predictionId} {
       allow read: if isAuthenticated();
 
@@ -64,12 +80,20 @@ service cloud.firestore {
         request.resource.data.status == 'PENDIENTE' &&
         (!('result' in request.resource.data) || request.resource.data.result == null);
 
+      // AI-NOTE: Permitir al dueño actualizar predicciones Polla Mundialista (modificar marcador en ventana 48h)
+      // o solicitar cancelación de predicciones PAGADAS
       allow update: if isAdmin() || (
         isAuthenticated() &&
         request.resource.data.email == request.auth.token.email &&
-        resource.data.status == 'PAGADO' &&
-        request.resource.data.status == 'CANCELACION_SOLICITADA' &&
-        (!('result' in resource.data) || resource.data.result == null)
+        (!('result' in resource.data) || resource.data.result == null) && (
+          // Cancelación: solo cambiar status de PAGADO a CANCELACION_SOLICITADA
+          (resource.data.status == 'PAGADO' && request.resource.data.status == 'CANCELACION_SOLICITADA') ||
+          // Modificación de predicción Polla Mundialista: solo cambiar prediction y lockedAt
+          (resource.data.type == 'POLla_MUNDIALISTA' &&
+           resource.data.status == 'PENDIENTE' &&
+           request.resource.data.status == 'PENDIENTE' &&
+           request.resource.data.prediction is string)
+        )
       );
       
       allow delete: if isAdmin() || (

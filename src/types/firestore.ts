@@ -2,6 +2,7 @@ export interface Prediction {
   id: string;
   email?: string;
   type?: string;
+  fixtureId?: string;
   matchDetails?: string;
   prediction?: string;
   status: 'PENDIENTE' | 'PAGADO' | 'CANCELACION_SOLICITADA' | 'CANCELADA';
@@ -10,6 +11,14 @@ export interface Prediction {
   finalScore?: string;
   homeLogo?: string;
   awayLogo?: string;
+  tokenCost?: number;
+  lockedAt?: any;
+}
+
+export interface AppUser {
+  uid: string;
+  email: string;
+  tokens: number;
 }
 
 export interface RadarMatch {
