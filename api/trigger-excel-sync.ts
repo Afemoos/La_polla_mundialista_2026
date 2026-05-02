@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 const ADMIN_EMAILS = ["afemos027@gmail.com", "afemos023@gmail.com", "daar.523@gmail.com"];
 
 export default async function handler(req: Request) {
