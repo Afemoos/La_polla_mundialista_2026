@@ -33,13 +33,7 @@ function MatchCard({ match }: { match: MatchResult }) {
         : 'VS';
 
     return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.75rem 0',
-            borderBottom: '1px solid var(--glass-border)'
-        }}>
+        <div className="match-result-row">
             {/* Equipo local */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                 <img src={match.homeFlag} width="24" height="24" alt={match.homeTeam}
@@ -69,7 +63,7 @@ function MatchCard({ match }: { match: MatchResult }) {
             </div>
 
             {/* Fecha */}
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '12px', minWidth: '70px', textAlign: 'right' }}>
+            <div className="match-result-date">
                 {date}
             </div>
         </div>

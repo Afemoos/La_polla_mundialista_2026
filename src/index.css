@@ -605,3 +605,32 @@ tr:hover td {
   }
 }
 
+/* Resultados.tsx Responsive */
+.match-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.match-result-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: 12px;
+  min-width: 70px;
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .match-result-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .match-result-date {
+    width: 100%;
+    text-align: center;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}
