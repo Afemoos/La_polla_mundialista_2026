@@ -614,6 +614,20 @@ tr:hover td {
   border-bottom: 1px solid var(--glass-border);
 }
 
+.match-result-teams-container {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.team-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .match-result-date {
   font-size: 0.7rem;
   color: var(--text-muted);
@@ -624,13 +638,19 @@ tr:hover td {
 
 @media (max-width: 600px) {
   .match-result-row {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
+  }
+  .match-result-teams-container {
+    justify-content: space-between;
+    width: 100%;
   }
   .match-result-date {
     width: 100%;
     text-align: center;
     margin-left: 0;
+    min-width: auto;
     margin-top: 4px;
   }
 }

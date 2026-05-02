@@ -34,32 +34,35 @@ function MatchCard({ match }: { match: MatchResult }) {
 
     return (
         <div className="match-result-row">
-            {/* Equipo local */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                <img src={match.homeFlag} width="24" height="24" alt={match.homeTeam}
-                    style={{ borderRadius: '50%', objectFit: 'cover' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{match.homeTeam}</span>
-            </div>
+            <div className="match-result-teams-container">
+                {/* Equipo local */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <img src={match.homeFlag} width="24" height="24" alt={match.homeTeam}
+                        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    <span className="team-name" title={match.homeTeam}>{match.homeTeam}</span>
+                </div>
 
-            {/* Marcador */}
-            <div style={{
-                background: 'var(--glass-bg)',
-                borderRadius: '8px',
-                padding: '4px 12px',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                minWidth: '60px',
-                textAlign: 'center',
-                color: 'var(--primary)'
-            }}>
-                {score}
-            </div>
+                {/* Marcador */}
+                <div style={{
+                    background: 'var(--glass-bg)',
+                    borderRadius: '8px',
+                    padding: '4px 12px',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    minWidth: '60px',
+                    textAlign: 'center',
+                    color: 'var(--primary)',
+                    flexShrink: 0
+                }}>
+                    {score}
+                </div>
 
-            {/* Equipo visitante */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{match.awayTeam}</span>
-                <img src={match.awayFlag} width="24" height="24" alt={match.awayTeam}
-                    style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                {/* Equipo visitante */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+                    <span className="team-name" title={match.awayTeam} style={{ textAlign: 'right' }}>{match.awayTeam}</span>
+                    <img src={match.awayFlag} width="24" height="24" alt={match.awayTeam}
+                        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                </div>
             </div>
 
             {/* Fecha */}
