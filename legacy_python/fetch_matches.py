@@ -133,19 +133,19 @@ def fetch_worldcup_path(db):
 
     # Los 13 partidos objetivo con fechas exactas y costo en tokens
     TARGET_MATCHES = [
-        ("wc-01", "México", "Sudáfrica", "2026-06-11T17:00:00-05:00", 1),
-        ("wc-02", "Brasil", "Marruecos", "2026-06-13T17:00:00-05:00", 1),
-        ("wc-03", "Países Bajos", "Japón", "2026-06-14T17:00:00-05:00", 1),
-        ("wc-04", "Inglaterra", "Croacia", "2026-06-17T17:00:00-05:00", 1),
-        ("wc-05", "Colombia", "Uzbekistán", "2026-06-17T22:00:00-05:00", 1),
-        ("wc-06", "Argentina", "Austria", "2026-06-22T17:00:00-05:00", 1),
-        ("wc-07", "Portugal", "Uzbekistán", "2026-06-23T17:00:00-05:00", 1),
-        ("wc-08", "Colombia", "RD Congo", "2026-06-23T22:00:00-05:00", 1),
-        ("wc-09", "Escocia", "Brasil", "2026-06-24T17:00:00-05:00", 1),
-        ("wc-10", "Ecuador", "Alemania", "2026-06-25T17:00:00-05:00", 1),
-        ("wc-11", "Noruega", "Francia", "2026-06-26T17:00:00-05:00", 1),
-        ("wc-12", "Uruguay", "España", "2026-06-26T22:00:00-05:00", 1),
-        ("wc-13", "Colombia", "Portugal", "2026-06-27T19:30:00-05:00", 1),
+        ("wc-01", "México", "Sudáfrica", "2026-06-11T17:00:00-05:00", 1, "Estadio Azteca (Ciudad de México)"),
+        ("wc-02", "Brasil", "Marruecos", "2026-06-13T17:00:00-05:00", 1, "MetLife Stadium (Nueva Jersey)"),
+        ("wc-03", "Países Bajos", "Japón", "2026-06-14T17:00:00-05:00", 1, "AT&T Stadium (Arlington/Dallas)"),
+        ("wc-04", "Inglaterra", "Croacia", "2026-06-17T17:00:00-05:00", 1, "AT&T Stadium (Arlington/Dallas)"),
+        ("wc-05", "Colombia", "Uzbekistán", "2026-06-17T22:00:00-05:00", 1, "Estadio Azteca (Ciudad de México)"),
+        ("wc-06", "Argentina", "Austria", "2026-06-22T17:00:00-05:00", 1, "AT&T Stadium (Texas)"),
+        ("wc-07", "Portugal", "Uzbekistán", "2026-06-23T17:00:00-05:00", 1, "NRG Stadium (Houston)"),
+        ("wc-08", "Colombia", "RD Congo", "2026-06-23T22:00:00-05:00", 1, "Estadio Akron (Guadalajara)"),
+        ("wc-09", "Escocia", "Brasil", "2026-06-24T17:00:00-05:00", 1, "Hard Rock Stadium (Miami)"),
+        ("wc-10", "Ecuador", "Alemania", "2026-06-25T17:00:00-05:00", 1, "MetLife Stadium (Nueva Jersey)"),
+        ("wc-11", "Noruega", "Francia", "2026-06-26T17:00:00-05:00", 1, "Gillette Stadium (Foxborough/Boston)"),
+        ("wc-12", "Uruguay", "España", "2026-06-26T22:00:00-05:00", 1, "Estadio Akron (Guadalajara)"),
+        ("wc-13", "Colombia", "Portugal", "2026-06-27T19:30:00-05:00", 1, "Hard Rock Stadium (Miami)"),
     ]
 
     # Intentar obtener fixtures reales del Mundial 2026
@@ -176,7 +176,7 @@ def fetch_worldcup_path(db):
     logo_cache = {}
     matches = []
 
-    for match_id, home_name, away_name, date_str, token_cost in TARGET_MATCHES:
+    for match_id, home_name, away_name, date_str, token_cost, stadium_name in TARGET_MATCHES:
         key = (home_name, away_name)
         fixture = api_fixtures.get(key)
 
@@ -189,7 +189,7 @@ def fetch_worldcup_path(db):
                 "awayTeam": fixture["teams"]["away"]["name"],
                 "homeFlag": fixture["teams"]["home"]["logo"],
                 "awayFlag": fixture["teams"]["away"]["logo"],
-                "stadium": fixture["fixture"]["venue"]["name"] or "Por definir",
+                "stadium": fixture["fixture"]["venue"]["name"] or stadium_name,
                 "date": fixture["fixture"]["date"],
                 "probHome": h,
                 "probDraw": d,
@@ -209,7 +209,7 @@ def fetch_worldcup_path(db):
                 "awayTeam": away_name,
                 "homeFlag": home_logo,
                 "awayFlag": away_logo,
-                "stadium": "Por definir",
+                "stadium": stadium_name,
                 "date": date_str,
                 "probHome": 33,
                 "probDraw": 33,
