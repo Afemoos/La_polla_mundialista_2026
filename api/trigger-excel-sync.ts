@@ -9,8 +9,8 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const body = await req.json();
-    const email = body.email as string | undefined;
+    const body = (await req.json()) as { email?: string };
+    const email = body.email;
 
     if (!email || !ADMIN_EMAILS.includes(email)) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
