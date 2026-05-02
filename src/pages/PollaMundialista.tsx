@@ -29,8 +29,8 @@ interface UserPredictionState {
 }
 
 const DUMMY_MATCHES: WorldCupMatch[] = [
-  { id: 'wc-grupos-1', phase: 'Fase de Grupos - Jornada 1', homeTeam: 'Colombia', awayTeam: 'Uzbekistán', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: '', stadium: 'Por definir', date: '2026-06-17T22:00:00-05:00', probHome: 50, probDraw: 30, probAway: 20, tokenCost: 1, isDefined: true },
-  { id: 'wc-grupos-2', phase: 'Fase de Grupos - Jornada 2', homeTeam: 'Colombia', awayTeam: 'RD Congo', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: '', stadium: 'Por definir', date: '2026-06-23T22:00:00-05:00', probHome: 55, probDraw: 25, probAway: 20, tokenCost: 1, isDefined: true },
+  { id: 'wc-grupos-1', phase: 'Fase de Grupos - Jornada 1', homeTeam: 'Colombia', awayTeam: 'Uzbekistán', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/66.png', stadium: 'Por definir', date: '2026-06-17T22:00:00-05:00', probHome: 50, probDraw: 30, probAway: 20, tokenCost: 1, isDefined: true },
+  { id: 'wc-grupos-2', phase: 'Fase de Grupos - Jornada 2', homeTeam: 'Colombia', awayTeam: 'RD Congo', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/34.png', stadium: 'Por definir', date: '2026-06-23T22:00:00-05:00', probHome: 55, probDraw: 25, probAway: 20, tokenCost: 1, isDefined: true },
   { id: 'wc-grupos-3', phase: 'Fase de Grupos - Jornada 3', homeTeam: 'Colombia', awayTeam: 'Portugal', homeFlag: 'https://media.api-sports.io/football/teams/8.png', awayFlag: 'https://media.api-sports.io/football/teams/27.png', stadium: 'Por definir', date: '2026-06-27T19:30:00-05:00', probHome: 35, probDraw: 30, probAway: 35, tokenCost: 1, isDefined: true },
   { id: 'wc-octavos', phase: 'Octavos de Final', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 2, isDefined: false },
   { id: 'wc-cuartos', phase: 'Cuartos de Final', homeTeam: 'Falta por definirse', awayTeam: 'Falta por definirse', homeFlag: '', awayFlag: '', stadium: 'Falta por definirse', date: '', probHome: 0, probDraw: 0, probAway: 0, tokenCost: 3, isDefined: false },
@@ -202,7 +202,7 @@ function MatchCard({
         )}
         {match.date && (
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Calendar size={12} /> {new Date(match.date).toLocaleDateString('es-CO')}
+            <Calendar size={12} /> {new Date(match.date).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short', hour12: true })}
           </span>
         )}
         {(!match.stadium || match.stadium === 'Falta por definirse') && !match.date && (
