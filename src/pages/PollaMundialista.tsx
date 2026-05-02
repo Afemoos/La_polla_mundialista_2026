@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Prediction } from '../types/firestore';
 import { Calendar, MapPin, Lock, Edit3, Save, AlertTriangle, Coins } from 'lucide-react';
@@ -49,8 +49,14 @@ function MatchCard({
   const hoursSinceLocked = lockedTime ? (now.getTime() - lockedTime.getTime()) / (1000 * 60 * 60) : 0;
   const is48hExceeded = lockedTime !== null && hoursSinceLocked >= 48;
   const hasPrediction = userPrediction.exists;
-  const canModify = hasPrediction && !is48hExceeded;
-  const isLocked = hasPrediction && is48hExceeded;
+
+  // AI-NOTE: Bloquear automáticamente 1 hora antes del partido para evitar apuestas de último minuto
+  const matchDate = match.date ? new Date(match.date) : null;
+  const hoursUntilMatch = matchDate ? (matchDate.getTime() - now.getTime()) / (1000 * 60 * 60) : Infinity;
+  const isPreMatchLocked = hoursUntilMatch <= 1;
+
+  const canModify = hasPrediction && !is48hExceeded && !isPreMatchLocked;
+  const isLocked = (hasPrediction && is48hExceeded) || isPreMatchLocked;
 
   const prepopulateScores = () => {
     if (userPrediction.prediction && !isEditing) {
@@ -153,10 +159,10 @@ function MatchCard({
 
     setSaving(true);
     try {
-      // AI-NOTE: Forzar bloqueo inmediato restando 49h a lockedAt
+      // AI-NOTE: Forzar bloqueo inmediato restando 49h a lockedAt usando Timestamp de Firestore
       const pastTime = new Date(now.getTime() - 49 * 60 * 60 * 1000);
       await updateDoc(doc(db, 'predictions', userPrediction.docId), {
-        lockedAt: pastTime
+        lockedAt: Timestamp.fromDate(pastTime)
       });
       alert('Predicción bloqueada definitivamente.');
     } catch (error) {
@@ -242,7 +248,9 @@ function MatchCard({
       {isLocked && (
         <div style={{ textAlign: 'center', padding: '8px', marginBottom: '0.75rem', background: 'var(--glass-bg)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
           <Lock size={14} style={{ marginRight: '6px', color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Los marcadores han sido guardados y no se pueden modificar.</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            {isPreMatchLocked ? 'El partido está por comenzar. Las predicciones están cerradas.' : 'Los marcadores han sido guardados y no se pueden modificar.'}
+          </span>
         </div>
       )}
 
@@ -276,7 +284,7 @@ function MatchCard({
         {!match.isDefined && (
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Falta por definirse</span>
         )}
-        {match.isDefined && !hasPrediction && (
+        {match.isDefined && !hasPrediction && !isPreMatchLocked && (
           <button
             className="btn-primary"
             style={{ width: '100%' }}

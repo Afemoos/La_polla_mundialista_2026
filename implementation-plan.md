@@ -28,33 +28,59 @@ Basado en el QA reciente, se detectaron áreas de mejora en el registro de apues
 - **Extracción:** El bot extraerá logos, IDs de equipos y `fixtureId` de la API. *Obligatorio:* Si la API de fútbol no los retorna aún (por estar lejanos en el tiempo), el script de Python deberá usar la API de *Teams* para traer los logos de los países e insertar estos 13 registros en Firestore usando la fecha exacta indicada, garantizando que el Frontend no use datos planos locales.
 - **Documentación API-Football para el Agente:** 
   - Host a utilizar: `v3.football.api-sports.io`
-  - *Para buscar partidos:* Endpoint `GET /fixtures`. Parámetros útiles: `?league=1&season=2026` o `?date=YYYY-MM-DD`.
-  - *Para buscar logos de países (si no hay partido):* Endpoint `GET /teams`. Parámetros útiles: `?search=Colombia` o `?name=Colombia`. Extraer de `response[0].team.logo`.
-  - *Para predicciones:* Endpoint `GET /predictions`. Parámetro: `?fixture={id}`.
+- **Problema de UX:** El panel de administración (`Admin.tsx`) actualmente muestra todas las tablas desplegadas al mismo tiempo. Al tener más de 100 predicciones, el administrador debe hacer un scroll excesivo para llegar a funciones críticas como la "Gestión de Tokens".
+- **Problema de Sincronización:** El administrador necesita una forma de forzar el envío de datos a Google Sheets (Excel) bajo demanda desde la página web, sin tener que esperar los 5 minutos del bot, y sobre todo, **sin** disparar consultas innecesarias a la API-Football que consuman la cuota diaria.
 
-### 2.2 Frontend / UI (`PollaMundialista.tsx`)
-- **Limpieza de Datos Planos:** Eliminar por completo el fallback local `DUMMY_MATCHES`. La vista debe renderizar exclusivamente el array `matches` proveniente de `system/worldcup_path`.
-- **Botón de Bloqueo Inmediato:** En cada tarjeta donde el usuario tenga una apuesta activa y esté dentro de las 48 horas, además del botón "Modificar", añadir un botón rojo o distintivo llamado `[Bloquear Definitivamente]`.
-  - **Lógica:** Al presionarlo, actualizar el documento en Firestore cambiando `lockedAt` a una fecha antigua (ej. restando 48h) o añadiendo un flag `isLockedManually: true`. Esto inhabilitará las modificaciones inmediatamente.
-- **Cobro de Tokens (Aclaración):** *Nota para el agente:* Las reglas de Firestore ya fueron parcheadas para permitir al usuario descontar sus propios tokens. Revisa la lógica de `handleModify` para confirmar que modificar NO resta tokens nuevamente.
+> [!IMPORTANT]
+> **Aprobación Requerida:** Para lograr el botón de sincronización manual de forma segura sin exponer tokens en el frontend, se requerirá crear una "Vercel Serverless Function" (una API en la nube) y generar un Token de Acceso Personal en GitHub. ¿Estás de acuerdo con este enfoque técnico?
 
-### 2.3 Panel Admin (`Admin.tsx`)
-- **Modal de Historial Individual:** En la tabla "Gestión de Tokens" (donde se listan los usuarios), añadir un botón con el icono de un "Ojo" (Ver Predicciones).
-- **Lógica:** Al hacer clic, se abrirá un Modal (o se expandirá la fila) mostrando una tabla filtrada que contenga **solo** las predicciones (`allBets`) donde `bet.email === usuario_seleccionado`.
-- **Datos a mostrar:** Partido, Predicción Actual, y Estado del Tiempo (ej. "Faltan 12 horas para bloqueo" o "Bloqueado").
+## 2. Infraestructura y Backend
+- **Nuevo GitHub Action (`sync_excel_manual.yml`):** Se creará un nuevo workflow en GitHub que se pueda disparar manualmente (`workflow_dispatch`). Este workflow ejecutará **exclusivamente** el script `legacy_python/contabilidad.py` (y opcionalmente `auditor.py`), omitiendo por completo `fetch_matches.py`. Así protegemos las peticiones a la API-Football.
+- **Vercel API (`api/trigger-excel-sync.js` o `.ts`):** Dado que estamos en Vite, Vercel nos permite crear funciones de backend en una carpeta `/api`. Esta función recibirá la petición del botón de React, verificará el token de Firebase del admin (para seguridad), y utilizará un Token de GitHub (`GITHUB_PAT` en las variables de entorno de Vercel) para disparar silenciosamente el Action de arriba.
 
----
+## 3. Frontend: Interfaces y Componentes (UI/UX)
+- **Componente de Acordeón:** En `Admin.tsx`, envolveremos las tablas de "Usuarios Registrados", "Gestión de Tokens" y "Auditoría de Apuestas" en contenedores colapsables. 
+- **Reordenamiento lógico:** Sugerimos mover "Gestión de Tokens" a la parte superior, ya que es la tarea administrativa más frecuente (aprobar pagos). Las tablas iniciarán contraídas por defecto para mantener la pantalla limpia.
+- **Botón de Sincronización:** Un botón prominente "Exportar a Excel (Manual)" que llamará a nuestra nueva función Serverless y mostrará un estado de carga mientras GitHub realiza el proceso.
 
-## 3. To-Do List (Checklist de Progreso)
-*Agente: Marca con una `[x]` las tareas a medida que las vayas completando.*
+## 4. Detalles Técnicos y Reglas de Implementación (Para el Agente)
 
-### Backend / API-Football
-- [x] 1. **fetch_matches.py**: Modificar la extracción para armar y guardar en Firestore exclusivamente los 13 partidos listados en los requerimientos. Usar la API de equipos (`/teams`) o de partidos (`/fixtures`) para poblar logos reales de API-Football. No usar arrays estáticos de fallback en el frontend.
+### A. Vercel Serverless Function (`api/trigger-excel-sync.ts`)
+- **Firma:** Debe exportar por defecto un handler asíncrono para Vercel: `export default async function handler(req, res)`.
+- **Llamada a GitHub API:** Deberá hacer un `POST` a `https://api.github.com/repos/Afemoos/La_polla_mundialista_2026/actions/workflows/sync_excel_manual.yml/dispatches`.
+- **Cuerpo (Payload):** `{"ref":"main"}`.
+- **Headers requeridos por GitHub:** 
+  - `Accept: application/vnd.github.v3+json`
+  - `Authorization: Bearer ${process.env.GITHUB_PAT}`
+  - `User-Agent: Vercel-Serverless-Function`
+- **Seguridad Ligera:** Como no tenemos `firebase-admin` configurado en Node.js, el frontend enviará el email del usuario en el body. Valida en el backend que el email pertenezca a la lista de administradores autorizados (Afemos027, Afemos023, Daar.523) antes de hacer la petición a GitHub.
 
-### Frontend: Lógica de Apuestas
-- [x] 2. **PollaMundialista.tsx**: Eliminar constantes de Dummy Matches. Cargar dinámicamente desde Firebase (`worldcup_path`).
-- [x] 3. **PollaMundialista.tsx**: Añadir el botón "Bloquear Definitivamente" en las tarjetas de apuestas activas para cancelar voluntariamente el periodo de gracia de 48h.
+### B. Diseño Frontend (`Admin.tsx`)
+- **Acordeones:** No instales librerías pesadas como Radix o MUI. Utiliza etiquetas nativas de HTML5 `<details>` y `<summary>` o construye un componente simple usando `useState` (ej. `isTokensOpen`) con una animación CSS sencilla y los iconos de *lucide-react* (ChevronDown/ChevronUp).
+- **Estado de Carga:** El botón de "Sincronizar" debe bloquearse (disabled) una vez clickeado y mostrar un `Loader` (lucide-react). Debe liberar el estado después de obtener respuesta exitosa de la API `/api/trigger-excel-sync`.
 
-### Frontend: Panel de Control (Admin)
-- [x] 4. **Admin.tsx**: Añadir un botón para inspeccionar usuarios individuales en la tabla de Gestión de Tokens.
-- [x] 5. **Admin.tsx**: Crear un Modal o Vista Secundaria que muestre los 13 partidos (o predicciones hechas) del usuario seleccionado, reflejando si están bloqueados o cuánto tiempo les queda de modificación.
+### C. Experiencia de Usuario y Reglas de Negocio Extra
+- **Modo Claro por defecto:** Cambiar el estado inicial en `ThemeContext.tsx` o el atributo en el `index.html` para que inicie en Light Mode.
+- **Fix Botón de Bloqueo:** El error actual ocurre probablemente por un mismatch de tipos de fecha (`Date` vs `Timestamp`). En `handleLockNow`, asegúrate de usar `Timestamp.fromDate(pastTime)` en lugar de enviar un objeto Date crudo a Firebase, o verifica si la regla de Firebase exige un string.
+- **Bloqueo por Horario de Partido (Pre-Match Lock):** 
+  - La tarjeta de apuesta (`MatchCard`) recibe la `match.date` (Fecha del partido). 
+  - Implementa una validación: Si la fecha/hora actual está a menos de 1 hora del `match.date`, la tarjeta debe considerarse `isLocked = true` automáticamente, deshabilitando el botón de Guardar y Modificar. Esto cerrará "manualmente" pero de forma automática las apuestas antes de que empiece a rodar el balón.
+
+## 5. To-Do List (Checklist de Progreso)
+
+### Infraestructura (GitHub & Vercel)
+- [x] 1. Crear el archivo `.github/workflows/sync_excel_manual.yml` con el flujo recortado (solo ejecutar Python contabilidad).
+- [x] 2. Crear la carpeta raíz `/api` y el endpoint `trigger-excel-sync.ts` con la lógica de conexión a GitHub.
+
+### Interfaz del Panel de Administración (`Admin.tsx`)
+- [x] 3. Refactorizar el diseño de `Admin.tsx` usando un sistema de acordeones para las 3 tablas.
+- [x] 4. Reordenar el renderizado: colocar "Gestión de Tokens" en la primera posición.
+- [x] 5. Integrar el botón "Sincronizar a Excel Ahora", conectado al endpoint `/api/trigger-excel-sync`, con manejo de errores y notificaciones de éxito/carga.
+
+### Reglas de Negocio Extra (UI General)
+- [x] 6. Establecer el Modo Claro como tema por defecto.
+- [x] 7. Corregir el error de Firebase en la función `handleLockNow` al bloquear la tarjeta.
+- [x] 8. Implementar lógica matemática en `PollaMundialista.tsx` para bloquear las tarjetas automáticamente 1 hora antes del inicio oficial del partido (`match.date`).
+
+## Estado de Variables de Entorno
+- ✅ **GITHUB_PAT**: Configurado en Vercel para permitir a la API Serverless ejecutar los flujos de GitHub Actions.
