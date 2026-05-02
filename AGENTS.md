@@ -109,7 +109,7 @@ Para asegurar que los agentes entiendan y ejecuten desarrollos complejos sin des
 
 Cuando el archivo `implementation-plan.md` esté listo, inicia una nueva sesión con el agente y utiliza EXACTAMENTE este prompt:
 
-> *"Hola. Vamos a desarrollar una nueva gran funcionalidad para este proyecto. Primero, lee estrictamente los archivos `@AGENTS.md` para entender mis reglas de negocio, diseño y seguridad. Luego, abre y lee `@implementation-plan.md`. Ese archivo contiene tu hoja de ruta. Quiero que vayas ejecutando la sección 'To-Do List' paso a paso, modificando el código necesario. Después de completar cada tarea del To-Do list, edita el archivo `@implementation-plan.md` marcando la casilla con una `[x]` antes de proceder a la siguiente. Solo detente y pregúntame si encuentras un error crítico que requiera mi decisión."*
+> *"Hello. We are going to develop a major new feature for this project. First, strictly read the `@AGENTS.md` file to understand my business rules, design guidelines, and security standards. Then, open and read `@implementation-plan.md`. That file contains your roadmap. I want you to execute the 'To-Do List' section step by step, modifying the necessary code. After completing each task on the To-Do list, edit the `@implementation-plan.md` file by marking the checkbox with an `[x]` before proceeding to the next one. Only stop and ask me if you encounter a critical error that requires my decision."*
 
 ### Estructura Estándar de `implementation-plan.md`
 
