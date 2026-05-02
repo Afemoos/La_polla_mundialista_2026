@@ -100,3 +100,51 @@ Documentos con estructura (`src/types/firestore.ts`):
 - **Cero pantallas en blanco:** Toda operación asíncrona (Firestore o API externa) debe tener un estado de `loading` (UI visual) y bloques `try/catch` rigurosos. Si algo falla, notificar al usuario (no ocultar el error).
 - **Tipado Fuerte:** Se prohíbe el uso de `any`. Todo dato proveniente de Firestore o APIs debe mapearse a una Interfaz TypeScript estricta.
 - **Modularidad DRY:** Archivos de UI que superen las ~250 líneas y contengan lógica repetida deben extraerse a `src/components/` o `src/hooks/`.
+
+## 📋 Estándar de Implementación de Funcionalidades (Plan & Prompt)
+
+Para asegurar que los agentes entiendan y ejecuten desarrollos complejos sin desviarse, todo nuevo desarrollo masivo debe seguir esta plantilla para la creación de un plan, y ejecutarse mediante un *prompt* estándar.
+
+### Prompt Estándar para Ejecución de Planes
+
+Cuando el archivo `implementation-plan.md` esté listo, inicia una nueva sesión con el agente y utiliza EXACTAMENTE este prompt:
+
+> *"Hola. Vamos a desarrollar una nueva gran funcionalidad para este proyecto. Primero, lee estrictamente los archivos `@AGENTS.md` para entender mis reglas de negocio, diseño y seguridad. Luego, abre y lee `@implementation-plan.md`. Ese archivo contiene tu hoja de ruta. Quiero que vayas ejecutando la sección 'To-Do List' paso a paso, modificando el código necesario. Después de completar cada tarea del To-Do list, edita el archivo `@implementation-plan.md` marcando la casilla con una `[x]` antes de proceder a la siguiente. Solo detente y pregúntame si encuentras un error crítico que requiera mi decisión."*
+
+### Estructura Estándar de `implementation-plan.md`
+
+Si vas a redactar un nuevo plan para el futuro, utiliza esta plantilla obligatoria:
+
+```markdown
+# Plan de Implementación: [Nombre de la Funcionalidad]
+
+## 1. Contexto y Objetivos
+- Breve descripción de qué se quiere lograr y por qué.
+
+## 2. Arquitectura de Base de Datos (Firestore)
+- Colecciones a crear o modificar.
+- Nuevos campos requeridos y tipos de datos (TypeScript interfaces).
+- Cambios requeridos en `firestore.rules`.
+
+## 3. Backend / APIs (Si aplica)
+- Nuevos scripts de Python o llamadas necesarias a la API-Football.
+
+## 4. Frontend: Interfaces y Componentes (UI/UX)
+- Rutas nuevas a crear en el enrutador.
+- Componentes clave a desarrollar y estilos requeridos (uso de variables CSS, glassmorphism).
+
+## 5. Lógica de Reglas de Negocio
+- Estados de UI (cargas, bloqueos, permisos de administrador).
+- Validaciones matemáticas, de tiempo o de saldo de usuario.
+
+## 6. To-Do List (Checklist de Progreso)
+*Agente: Marca con una `[x]` las tareas a medida que las vayas completando.*
+
+### [Categoría 1: ej. Base de Datos]
+- [ ] 1. Tarea específica.
+- [ ] 2. Tarea específica.
+
+### [Categoría 2: ej. UI y Lógica]
+- [ ] 3. Tarea específica.
+- [ ] 4. Tarea específica.
+```
