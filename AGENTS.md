@@ -53,3 +53,62 @@ El proyecto se divide en dos grandes bloques:
 -   **Verificación de Build**: `npm run build`
 -   **Despliegue de Reglas**: `npx firebase deploy --only firestore:rules`
 -   **Git Workflow**: `git add .`, `git commit -m "..."`, `git push origin main` (El push a `main` dispara el despliegue automático en Vercel).
+
+## 🔄 Estándares de Iteración y Verificación
+
+Para garantizar la estabilidad del proyecto y evitar que errores lleguen a producción, todo agente de IA u operador debe seguir rigurosamente este flujo antes de realizar cambios permanentes o hacer *push* al repositorio:
+
+1.  **Fase de Planificación (Planificación antes de Ejecución)**:
+    *   Cualquier cambio estructural, refactorización masiva o nueva funcionalidad requiere la creación previa de un plan (`implementation_plan.md`) para aprobación del usuario.
+    *   Desglosar tareas complejas en `task.md`.
+
+2.  **Modificación y Testing Local**:
+    *   Siempre ejecutar `npm run dev` para validar que la interfaz renderice correctamente tras las modificaciones.
+    *   Verificar interacciones de UI (botones, formularios, modales).
+    *   No modificar `index.css` de forma destructiva; siempre buscar mantener la compatibilidad con ambos temas (Light/Dark).
+
+3.  **Verificación Pre-Commit (Mandatorio)**:
+    *   **NUNCA** hacer commit sin antes ejecutar `npm run build`. Esto ejecuta `tsc -b && vite build` y previene que errores silenciosos de TypeScript rompan el despliegue automático en Vercel.
+    *   Si hay errores TS, deben ser solucionados (ej. añadiendo `type` a las importaciones de React) y volver a ejecutar el build.
+
+4.  **Estándares de Commit**:
+    *   Usar *Conventional Commits*: 
+        *   `feat:` (Nuevas funcionalidades)
+        *   `fix:` (Corrección de bugs)
+        *   `refactor:` (Cambios de código que no añaden ni arreglan nada visual)
+        *   `docs:` (Actualizaciones al `AGENTS.md` u otros documentos)
+        *   `style:` (Cambios en `index.css` o diseño visual)
+    *   Mensajes concisos y claros en **Español** o **Inglés técnico**.
+
+5.  **Despliegue Cauteloso**:
+    *   Recordar que Vercel despliega automáticamente cada *push* a `main`. Subir código roto detendrá el flujo continuo de CI/CD.
+    *   Para reglas de Firebase, asegurarse de que no se rompe la lectura pública de las colecciones `system/` antes de ejecutar `npx firebase deploy --only firestore:rules`.
+
+## 🛡️ Estándares de Código y Seguridad
+
+1.  **Manejo Estricto de Secretos (`.env`)**:
+    *   Ningún agente debe *hardcodear* claves de API, IDs de Firebase o URLs de bases de datos en el código fuente.
+    *   Para React/Vite usar `import.meta.env.VITE_...` y para los bots de Python usar `os.getenv('...')`.
+
+2.  **Estricta Tipificación (Cero `any`)**:
+    *   Evitar a toda costa el uso de `any` en TypeScript.
+    *   Todo documento de Firestore debe mapearse a una `Interface` explícita (ej. `interface MatchResult {...}`) para mantener la seguridad estática del código.
+
+3.  **Estados de Carga y Manejo de Errores**:
+    *   Toda operación asíncrona (lectura a Firebase o llamadas a API) debe contar con un estado de carga visual (`loading`).
+    *   Es obligatorio usar bloques `try/catch` para capturar errores, notificando al usuario en la UI para evitar "White Screens of Death".
+
+4.  **Modularidad y Regla DRY (Don't Repeat Yourself)**:
+    *   Evitar archivos masivos. Si una pieza de UI o lógica (ej. hooks de Firebase) se repite, debe extraerse a `src/components/` o `src/hooks/`.
+
+5.  **Comentarios de Contexto ("AI-NOTE")**:
+    *   Si se implementa un *workaround* o una solución poco ortodoxa debido a limitaciones técnicas, el agente debe dejar un comentario explicativo iniciando con `// AI-NOTE: ...`.
+    *   Esto previene que futuros agentes intenten "optimizar" o borrar ese código rompiendo el sistema.
+
+6.  **Política Conservadora de Eliminación (Deprecation)**:
+    *   No borrar funciones o archivos a menos que exista certeza absoluta de que son obsoletos.
+    *   Ante la duda, comentar el bloque o etiquetar la función con `// DEPRECATED` antes de proceder a la eliminación definitiva.
+
+7.  **Gestión de Habilidades de IA (Autoskills)**:
+    *   Este proyecto utiliza `npx autoskills` para la estandarización de habilidades (skills) de los agentes de IA (carpeta `.agents/skills/`).
+    *   Si un agente añade, actualiza o modifica habilidades, debe asegurarse de que el archivo `skills-lock.json` sea actualizado y subido en el respectivo *commit* para mantener la consistencia entre sesiones.
