@@ -1,114 +1,102 @@
-# Contexto y Reglas del Proyecto: La Polla Mundialista 2026
+# La Polla Mundialista 2026 — AGENTS.md
 
-Este documento (`AGENTS.md`) sirve como guía principal y memoria del proyecto para cualquier agente de IA que asista en el desarrollo de "La Polla Mundialista 2026". Contiene la arquitectura, el stack tecnológico, las reglas de negocio y las convenciones de código derivadas de las interacciones previas.
+## Comandos
 
-## 🛠️ Stack Tecnológico
+- **dev:** `npm run dev`
+- **build (obligatorio antes de commit):** `npm run build` — ejecuta `tsc -b && vite build`. El build debe pasar limpio; si falla, el push rompe Vercel.
+- **lint:** `npm run lint`
+- **deploy de reglas Firestore:** `npx firebase deploy --only firestore:rules`
 
-- **Frontend**: React 19, Vite, TypeScript.
-- **Backend (Scripts automatizados)**: Python 3.10.
-- **Base de Datos y Autenticación**: Firebase (Firestore, Firebase Auth con Google).
-- **Despliegue**: Vercel (Frontend), GitHub Actions (Ejecución de scripts Python mediante cron jobs).
-- **API Externa**: API-Football (v3).
+## Arquitectura
 
-## 🏗️ Arquitectura del Sistema
+### Frontend (React 19 + Vite 8 + TypeScript 6)
 
-El proyecto se divide en dos grandes bloques:
+SPA con autenticación Google via Firebase Auth. Páginas:
 
-1.  **Frontend (React SPA)**
-    *   `src/pages/Home.tsx`: Vista principal donde los usuarios ven los próximos partidos (radar) y envían sus predicciones.
-    *   `src/pages/MisApuestas.tsx`: Historial del usuario con sus apuestas. Muestra logos, resultados oficiales y permite cancelar apuestas `PENDIENTES` o solicitar cancelación de las `PAGADAS`.
-    *   `src/pages/Resultados.tsx`: Tablero de resultados recientes (Colombia, Champions League, Mundial 2026).
-    *   `src/pages/Admin.tsx`: Panel exclusivo para administradores para gestionar pagos, aprobar/rechazar cancelaciones y monitorear el consumo de la API.
-2.  **Backend (Bots de Python en `legacy_python/`)**
-    *   `fetch_matches.py`: Consulta la API para encontrar el próximo partido relevante (radar) y lo guarda en Firestore (`system/radar_match`).
-    *   `auditor.py`: Revisa los partidos finalizados, compara el marcador real con las predicciones y actualiza el estado de las apuestas a `GANADA` o `PERDIDA`, guardando también el `finalScore`.
-    *   `fetch_results.py`: Descarga los últimos 10 resultados de competiciones clave y los guarda en `system/recent_results`.
+| Ruta | Componente | Descripción |
+|------|-----------|-------------|
+| `/` | `Home.tsx` | Radares (Colombia y Global) con datos de `system/colombia_match` y `system/radar_match`. La zona de apuesta ("Participar en este Evento") está temporalmente deshabilitada. |
+| `/mis-apuestas` | `MisApuestas.tsx` | Historial del usuario con sus predicciones |
+| `/resultados` | `Resultados.tsx` | Últimos resultados de `system/recent_results` |
+| `/admin` | `Admin.tsx` | Solo admins. Gestión de pagos, cancelaciones |
+| `/polla-mundialista` | `PollaMundialista.tsx` | Placeholder "próximamente" |
 
-## 🚨 Reglas Críticas de Negocio
+- `src/components/Sidebar.tsx` — navegación lateral con toggle dark/light
+- `src/contexts/AuthContext.tsx` — provee `useAuth()` con `currentUser`, `loginWithGoogle`, `logout`, `isAdmin`. Admins hardcodeados: `afemos027@gmail.com`, `afemos023@gmail.com`, `daar.523@gmail.com`
+- `src/contexts/ThemeContext.tsx` — dark/light mode via `data-theme` attr en `<html>`
+- `src/types/firestore.ts` — interfaces `Prediction` y `RadarMatch`
+- `src/services/firestore.ts` — funciones helper para queries y mutaciones en Firestore
 
-1.  **Límites de la API (Rate Limiting)**
-    *   Tenemos un límite estricto de **7,500 requests diarias** en API-Football.
-    *   Todo script de Python DEBE registrar su consumo actualizando `system/api_status` (campos `requests_current` y `requests_limit`).
-    *   Los bots se ejecutan mediante GitHub Actions (`.github/workflows/`) con frecuencias controladas (ej. `fetch_results.py` cada 6 horas).
-2.  **Seguridad de Base de Datos (Firestore Rules)**
-    *   Las reglas de Firestore (`firestore.rules`) son la principal barrera de seguridad.
-    *   **Inmutabilidad Auditada**: Una vez que una apuesta tiene un campo `result` (`GANADA` o `PERDIDA`), **NUNCA** debe ser modificada o eliminada, ni siquiera por un administrador.
-    *   Las colecciones `system/recent_results` y `system/api_status` son de solo lectura para el cliente; solo los bots (vía Admin SDK) pueden escribir en ellas.
-3.  **Flujo de Estados de una Apuesta**
-    *   `status`: `PENDIENTE` -> `PAGADO`. (Modificable por Admin).
-    *   `status`: `CANCELACION_SOLICITADA` -> `CANCELADA`. (Usuario solicita, Admin aprueba).
-    *   `result`: `GANADA` o `PERDIDA`. Inyectado exclusivamente por el `auditor.py`.
+**Importante sobre TS:** `tsconfig.app.json` tiene `noUnusedLocals: true` y `noUnusedParameters: true`. Cualquier variable o import sin usar rompe el build. Al eliminar código, limpia también los imports y variables huérfanas.
 
-## 🎨 Convenciones de Diseño y UI
+### Backend (Python en `legacy_python/`)
 
--   **Aesthetic**: Diseño moderno, "glassmorphism" (tarjetas semitransparentes, bordes suaves), colores vibrantes para resaltar (ej. verde para GANADA, rojo para PERDIDA).
--   **Temas (Dark / Light Mode)**: El sistema soporta ambos temas a través de variables CSS (`--bg-dark`, `--text-main`, etc.) y el atributo `[data-theme='light']`. Los colores no deben estar hardcodeados como `rgba()` o `#hex` en los componentes, deben usar siempre las variables de `index.css`.
--   **Idioma**: Toda la interfaz de usuario, comentarios de código (preferiblemente) y mensajes deben estar en **Español**.
--   **Iconografía**: Se utiliza la librería `lucide-react`.
--   **Logos y Banderas**: Siempre que sea posible, las vistas de partidos deben mostrar los logos/banderas de los equipos (`homeLogo`, `awayLogo`) almacenados en Firestore.
+La carpeta `legacy_python/` contiene dos cosas:
 
-## 💻 Comandos Frecuentes
+**A. Scripts automatizados (bots)** ejecutados via GitHub Actions:
+- `fetch_matches.py` — busca próximos partidos de Colombia (team 8), Champions (league 2) y Mundial (league 1) via API-Football. Guarda en `system/colombia_match` y `system/radar_match`.
+- `auditor.py` — revisa partidos finalizados, compara predicciones con marcador real, asigna `result: GANADA | PERDIDA` en los docs de `predictions`.
+- `fetch_results.py` — descarga últimos resultados y los guarda en `system/recent_results`.
+- `contabilidad.py` — sincroniza datos de Firestore con Google Sheets (sheet ID hardcodeada). Usa `gspread`.
 
--   **Desarrollo Local**: `npm run dev`
--   **Verificación de Build**: `npm run build`
--   **Despliegue de Reglas**: `npx firebase deploy --only firestore:rules`
--   **Git Workflow**: `git add .`, `git commit -m "..."`, `git push origin main` (El push a `main` dispara el despliegue automático en Vercel).
+**B. Streamlit dashboard legacy** (`app.py`) — panel admin antiguo, no desplegado en Vercel. Usa Google OAuth directo y módulos en `core/` y `components/`.
 
-## 🔄 Estándares de Iteración y Verificación
+### GitHub Actions
 
-Para garantizar la estabilidad del proyecto y evitar que errores lleguen a producción, todo agente de IA u operador debe seguir rigurosamente este flujo antes de realizar cambios permanentes o hacer *push* al repositorio:
+| Workflow | Cron | Scripts |
+|----------|------|---------|
+| `accounting_sync.yml` | cada 5 min | `fetch_matches.py` → `contabilidad.py` → `auditor.py` |
+| `results_sync.yml` | cada 6 horas | `fetch_results.py` |
 
-1.  **Fase de Planificación (Planificación antes de Ejecución)**:
-    *   Cualquier cambio estructural, refactorización masiva o nueva funcionalidad requiere la creación previa de un plan (`implementation_plan.md`) para aprobación del usuario.
-    *   Desglosar tareas complejas en `task.md`.
+Ambos inyectan secretos como variables de entorno: `GCP_CREDENTIALS` (JSON de credenciales Firebase/Google), `API_FOOTBALL_KEY`.
 
-2.  **Modificación y Testing Local**:
-    *   Siempre ejecutar `npm run dev` para validar que la interfaz renderice correctamente tras las modificaciones.
-    *   Verificar interacciones de UI (botones, formularios, modales).
-    *   No modificar `index.css` de forma destructiva; siempre buscar mantener la compatibilidad con ambos temas (Light/Dark).
+## Firestore
 
-3.  **Verificación Pre-Commit (Mandatorio)**:
-    *   **NUNCA** hacer commit sin antes ejecutar `npm run build`. Esto ejecuta `tsc -b && vite build` y previene que errores silenciosos de TypeScript rompan el despliegue automático en Vercel.
-    *   Si hay errores TS, deben ser solucionados (ej. añadiendo `type` a las importaciones de React) y volver a ejecutar el build.
+### Colecciones/Documentos del sistema (`system/`)
 
-4.  **Estándares de Commit**:
-    *   Usar *Conventional Commits*: 
-        *   `feat:` (Nuevas funcionalidades)
-        *   `fix:` (Corrección de bugs)
-        *   `refactor:` (Cambios de código que no añaden ni arreglan nada visual)
-        *   `docs:` (Actualizaciones al `AGENTS.md` u otros documentos)
-        *   `style:` (Cambios en `index.css` o diseño visual)
-    *   Mensajes concisos y claros en **Español** o **Inglés técnico**.
+- `system/colombia_match` — próximo partido de Colombia (radar tricolor). Escritura solo admin/bots; lectura requiere auth.
+- `system/radar_match` — próximo partido global (Champions/Mundial). Mismas reglas que `colombia_match`.
+- `system/recent_results` — array de resultados recientes. Solo lectura pública autenticada; escritura `false` (solo Admin SDK).
+- `system/api_status` — `{ requests_current, requests_limit, last_updated }`. Lectura solo admin; escritura `false` (solo bots).
 
-5.  **Despliegue Cauteloso**:
-    *   Recordar que Vercel despliega automáticamente cada *push* a `main`. Subir código roto detendrá el flujo continuo de CI/CD.
-    *   Para reglas de Firebase, asegurarse de que no se rompe la lectura pública de las colecciones `system/` antes de ejecutar `npx firebase deploy --only firestore:rules`.
+### Colección `predictions`
 
-## 🛡️ Estándares de Código y Seguridad
+Documentos con estructura (`src/types/firestore.ts`):
+- `status`: `PENDIENTE` | `PAGADO` | `CANCELACION_SOLICITADA` | `CANCELADA`
+- `result`: `GANADA` | `PERDIDA` (asignado por `auditor.py`)
 
-1.  **Manejo Estricto de Secretos (`.env`)**:
-    *   Ningún agente debe *hardcodear* claves de API, IDs de Firebase o URLs de bases de datos en el código fuente.
-    *   Para React/Vite usar `import.meta.env.VITE_...` y para los bots de Python usar `os.getenv('...')`.
+**Reglas de negocio críticas:**
 
-2.  **Estricta Tipificación (Cero `any`)**:
-    *   Evitar a toda costa el uso de `any` en TypeScript.
-    *   Todo documento de Firestore debe mapearse a una `Interface` explícita (ej. `interface MatchResult {...}`) para mantener la seguridad estática del código.
+1. Una predicción con `result` asignado (`GANADA` o `PERDIDA`) no debe modificarse ni eliminarse. Las reglas de Firestore lo validan (`resource.data.result == null` en condiciones de escritura).
+2. El usuario solo puede crear predicciones con `status: PENDIENTE`. Solo admin cambia a `PAGADO`.
+3. Un usuario puede cambiar su predicción de `PAGADO` → `CANCELACION_SOLICITADA` (solicitar cancelación). Solo admin aprueba/rechaza.
+4. Un usuario puede eliminar su predicción solo si `status == PENDIENTE`.
+5. Los campos `probHome + probDraw + probAway` deben sumar exactamente 100 (validado en reglas Firestore).
 
-3.  **Estados de Carga y Manejo de Errores**:
-    *   Toda operación asíncrona (lectura a Firebase o llamadas a API) debe contar con un estado de carga visual (`loading`).
-    *   Es obligatorio usar bloques `try/catch` para capturar errores, notificando al usuario en la UI para evitar "White Screens of Death".
+## Estilo y UI
 
-4.  **Modularidad y Regla DRY (Don't Repeat Yourself)**:
-    *   Evitar archivos masivos. Si una pieza de UI o lógica (ej. hooks de Firebase) se repite, debe extraerse a `src/components/` o `src/hooks/`.
+- **CSS variables para colores** — usar siempre `var(--bg-dark)`, `var(--text-main)`, `var(--primary)`, etc. No hardcodear `#hex` o `rgba()`.
+- **Dark/Light mode** — controlado por `data-theme="light"` en `<html>`. El tema por defecto es dark (sin atributo).
+- **Glassmorphism** — tarjetas con `class="glass-card"`, fondos semitransparentes, bordes suaves.
+- **Iconos:** `lucide-react`
+- **Idioma:** español para toda la UI y comentarios.
 
-5.  **Comentarios de Contexto ("AI-NOTE")**:
-    *   Si se implementa un *workaround* o una solución poco ortodoxa debido a limitaciones técnicas, el agente debe dejar un comentario explicativo iniciando con `// AI-NOTE: ...`.
-    *   Esto previene que futuros agentes intenten "optimizar" o borrar ese código rompiendo el sistema.
+## Convenciones de código
 
-6.  **Política Conservadora de Eliminación (Deprecation)**:
-    *   No borrar funciones o archivos a menos que exista certeza absoluta de que son obsoletos.
-    *   Ante la duda, comentar el bloque o etiquetar la función con `// DEPRECATED` antes de proceder a la eliminación definitiva.
+- **AI-NOTE:** Al implementar workarounds o soluciones no obvias, comentar con `// AI-NOTE: explicación`. Esto previene que futuros agentes "corrijan" código que es intencional.
+- **No eliminar sin certeza** — ante la duda, comentar con `// DEPRECATED`.
+- **Secretos:** usar `import.meta.env.VITE_...` en frontend, `os.getenv('...')` en Python.
+- **Commits:** conventional commits (`feat:`, `fix:`, `refactor:`, `style:`, `docs:`). Push a `main` dispara deploy automático en Vercel.
 
-7.  **Gestión de Habilidades de IA (Autoskills)**:
-    *   Este proyecto utiliza `npx autoskills` para la estandarización de habilidades (skills) de los agentes de IA (carpeta `.agents/skills/`).
-    *   Si un agente añade, actualiza o modifica habilidades, debe asegurarse de que el archivo `skills-lock.json` sea actualizado y subido en el respectivo *commit* para mantener la consistencia entre sesiones.
+## Flujo de Trabajo y Verificación (Mandatorio)
+
+1. **Fase de Planificación:** Para cambios estructurales, crear primero un `implementation_plan.md` y `task.md` para aprobación del usuario.
+2. **Testing Local:** Ejecutar `npm run dev` y probar la UI manualmente antes de dar por terminado un cambio visual.
+3. **Pre-Commit Check:** Es **OBLIGATORIO** ejecutar `npm run build` antes de cualquier commit. Si TypeScript falla, el despliegue automático en Vercel se romperá. Corrige el tipado (ej. quitando `any` o importando tipos) y reintenta el build.
+4. **Manejo de Habilidades (Autoskills):** Si se añaden/modifican *skills* en `.agents/skills/`, ejecutar `npx autoskills` y asegurarse de subir el `skills-lock.json` en el commit.
+
+## Manejo de Errores y Estabilidad
+
+- **Cero pantallas en blanco:** Toda operación asíncrona (Firestore o API externa) debe tener un estado de `loading` (UI visual) y bloques `try/catch` rigurosos. Si algo falla, notificar al usuario (no ocultar el error).
+- **Tipado Fuerte:** Se prohíbe el uso de `any`. Todo dato proveniente de Firestore o APIs debe mapearse a una Interfaz TypeScript estricta.
+- **Modularidad DRY:** Archivos de UI que superen las ~250 líneas y contengan lógica repetida deben extraerse a `src/components/` o `src/hooks/`.
