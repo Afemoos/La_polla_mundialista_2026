@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, ListChecks, LogOut, CalendarDays, Settings, Globe } from 'lucide-react';
+import { Trophy, ListChecks, LogOut, CalendarDays, Settings, Globe, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const authCounter = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLinkClick = () => {
     setIsOpen(false);
@@ -67,6 +69,13 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       </div>
 
       <div className="user-profile">
+        <button 
+          onClick={toggleTheme} 
+          className="nav-item" 
+          style={{ width: '100%', marginBottom: '1rem', justifyContent: 'center', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+        >
+          {theme === 'dark' ? <><Sun size={18} /> Tema Claro</> : <><Moon size={18} /> Tema Oscuro</>}
+        </button>
         <div className="user-email">👤 {authCounter?.currentUser?.email}</div>
         <button onClick={authCounter?.logout} className="logout-btn">
           <LogOut size={16} /> Cerrar Sesión

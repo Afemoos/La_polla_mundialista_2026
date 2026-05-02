@@ -41,7 +41,8 @@ El proyecto se divide en dos grandes bloques:
 
 ## 🎨 Convenciones de Diseño y UI
 
--   **Aesthetic**: Diseño moderno, temas oscuros, "glassmorphism" (tarjetas semitransparentes, bordes suaves), colores vibrantes para resaltar (ej. verde para GANADA, rojo para PERDIDA).
+-   **Aesthetic**: Diseño moderno, "glassmorphism" (tarjetas semitransparentes, bordes suaves), colores vibrantes para resaltar (ej. verde para GANADA, rojo para PERDIDA).
+-   **Temas (Dark / Light Mode)**: El sistema soporta ambos temas a través de variables CSS (`--bg-dark`, `--text-main`, etc.) y el atributo `[data-theme='light']`. Los colores no deben estar hardcodeados como `rgba()` o `#hex` en los componentes, deben usar siempre las variables de `index.css`.
 -   **Idioma**: Toda la interfaz de usuario, comentarios de código (preferiblemente) y mensajes deben estar en **Español**.
 -   **Iconografía**: Se utiliza la librería `lucide-react`.
 -   **Logos y Banderas**: Siempre que sea posible, las vistas de partidos deben mostrar los logos/banderas de los equipos (`homeLogo`, `awayLogo`) almacenados en Firestore.

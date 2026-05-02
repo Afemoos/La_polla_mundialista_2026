@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
+  /* DARK THEME (Default) */
   --bg-dark: #0f111a;
   --bg-card: rgba(26, 29, 41, 0.7);
   --bg-card-hover: rgba(35, 40, 56, 0.9);
@@ -12,7 +13,48 @@
   --glass-border: rgba(255, 255, 255, 0.05);
   --accent-bl: #00F0FF;
   --accent-rd: #FF0055;
+  
+  /* Shared/Dynamic utility variables used in components */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --color-success: #00FF88;
+  --color-success-bg: rgba(0, 255, 136, 0.15);
+  --color-danger: #FF3366;
+  --color-danger-bg: rgba(255, 51, 102, 0.05);
+  --color-warning-bg: rgba(255, 215, 0, 0.15);
+  --table-header-bg: rgba(0, 0, 0, 0.2);
+  --input-bg: rgba(0, 0, 0, 0.2);
+  --page-title-gradient: linear-gradient(90deg, #FFF, #AAA);
+  --body-gradient-1: rgba(255, 215, 0, 0.04);
+  --body-gradient-2: rgba(0, 240, 255, 0.03);
 }
+
+[data-theme='light'] {
+  /* LIGHT THEME */
+  --bg-dark: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --primary: #eab308; /* Darker yellow/gold for better contrast */
+  --primary-hover: #ca8a04;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --accent-bl: #0284c7;
+  --accent-rd: #e11d48;
+  
+  /* Dynamic utility variables */
+  --glass-bg: rgba(0, 0, 0, 0.04);
+  --color-success: #16a34a;
+  --color-success-bg: rgba(22, 163, 74, 0.1);
+  --color-danger: #dc2626;
+  --color-danger-bg: rgba(220, 38, 38, 0.05);
+  --color-warning-bg: rgba(234, 179, 8, 0.1);
+  --table-header-bg: rgba(0, 0, 0, 0.03);
+  --input-bg: rgba(255, 255, 255, 0.5);
+  --page-title-gradient: linear-gradient(90deg, #0f172a, #475569);
+  --body-gradient-1: rgba(234, 179, 8, 0.05);
+  --body-gradient-2: rgba(2, 132, 199, 0.03);
+}
+
 
 * {
   box-sizing: border-box;
@@ -27,8 +69,9 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(circle at 15% 50%, rgba(255, 215, 0, 0.04), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.03), transparent 25%);
+    radial-gradient(circle at 15% 50%, var(--body-gradient-1), transparent 25%),
+    radial-gradient(circle at 85% 30%, var(--body-gradient-2), transparent 25%);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .login-screen {
@@ -246,7 +289,7 @@ body {
   font-size: 2.5rem;
   font-weight: 800;
   margin-bottom: 2rem;
-  background: linear-gradient(90deg, #FFF, #AAA);
+  background: var(--page-title-gradient);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -283,7 +326,7 @@ table {
 }
 
 th {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--table-header-bg);
   padding: 1rem;
   font-weight: 600;
   color: var(--text-muted);
@@ -294,7 +337,7 @@ th {
 
 td {
   padding: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 tr:last-child td {
@@ -302,7 +345,7 @@ tr:last-child td {
 }
 
 tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--glass-bg);
 }
 
 /* Badges */
@@ -316,13 +359,13 @@ tr:hover td {
 }
 
 .badge.pending {
-  background: rgba(255, 215, 0, 0.15);
+  background: var(--color-warning-bg);
   color: var(--primary);
 }
 
 .badge.paid {
-  background: rgba(0, 255, 136, 0.15);
-  color: #00FF88;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 /* Forms */
@@ -339,9 +382,9 @@ tr:hover td {
 
 .styled-input, .styled-select {
   width: 100%;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--input-bg);
   border: 1px solid var(--glass-border);
-  color: white;
+  color: var(--text-main);
   padding: 1rem;
   border-radius: 12px;
   font-size: 1rem;
@@ -377,9 +420,9 @@ tr:hover td {
 }
 
 .btn-danger-small {
-  background: rgba(255, 51, 102, 0.1);
-  color: #FF3366;
-  border: 1px solid rgba(255, 51, 102, 0.3);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--glass-border);
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   cursor: pointer;
@@ -397,9 +440,9 @@ tr:hover td {
 }
 
 .btn-warning-small {
-  background: rgba(255, 215, 0, 0.1);
+  background: var(--color-warning-bg);
   color: var(--primary);
-  border: 1px solid rgba(255, 215, 0, 0.3);
+  border: 1px solid var(--glass-border);
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   cursor: pointer;

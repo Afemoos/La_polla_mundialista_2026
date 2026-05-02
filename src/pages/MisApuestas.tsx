@@ -88,9 +88,9 @@ export default function MisApuestas() {
                                 {bets.map((bet) => {
                                     if (bet.status === 'CANCELADA') {
                                         return (
-                                            <tr key={bet.id} style={{ opacity: 0.6, backgroundColor: 'rgba(255, 51, 102, 0.05)' }}>
+                                            <tr key={bet.id} style={{ opacity: 0.6, backgroundColor: 'var(--color-danger-bg)' }}>
                                                 <td>
-                                                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                                                    <span style={{ background: 'var(--glass-bg)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                                                         {bet.id.slice(0, 8)}...
                                                     </span>
                                                 </td>
@@ -104,7 +104,7 @@ export default function MisApuestas() {
                                     return (
                                         <tr key={bet.id}>
                                         <td>
-                                            <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                                            <span style={{ background: 'var(--glass-bg)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                                                 {bet.id.slice(0, 8)}...
                                             </span>
                                         </td>
@@ -137,8 +137,8 @@ export default function MisApuestas() {
                                         </td>
                                         <td>
                                             {!bet.result && <span style={{ color: 'var(--text-muted)' }}>⏱️ En Juego</span>}
-                                            {bet.result === 'GANADA' && <span style={{ color: '#00FF88', fontWeight: 800 }}>🏆 GANADA</span>}
-                                            {bet.result === 'PERDIDA' && <span style={{ color: '#FF3366', fontWeight: 800 }}>💀 PERDIDA</span>}
+                                            {bet.result === 'GANADA' && <span style={{ color: 'var(--color-success)', fontWeight: 800 }}>🏆 GANADA</span>}
+                                            {bet.result === 'PERDIDA' && <span style={{ color: 'var(--color-danger)', fontWeight: 800 }}>💀 PERDIDA</span>}
                                         </td>
                                         <td>
                                             {!bet.result && (

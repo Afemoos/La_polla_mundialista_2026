@@ -64,7 +64,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 </div>
                 
                 <div style={{ flex: 1 }}>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px 20px', borderRadius: '20px', display: 'inline-block' }}>
+                    <div style={{ background: 'var(--glass-bg)', padding: '10px 20px', borderRadius: '20px', display: 'inline-block' }}>
                         <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>VS</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '5px' }}>
                             <Calendar size={12} style={{ marginRight: '5px' }} />
@@ -83,22 +83,22 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
             </div>
 
             <div className="radar-prob">
-                <div style={{ flex: 1, background: 'rgba(0, 255, 136, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(0,255,136,0.3)' }}>
+                <div style={{ flex: 1, background: 'var(--color-success-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-success)' }}>
                     <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.home.name}</div>
-                    <div style={{ fontWeight: 800, color: '#00FF88' }}>{matchData.probHome}%</div>
+                    <div style={{ fontWeight: 800, color: 'var(--color-success)' }}>{matchData.probHome}%</div>
                 </div>
-                <div style={{ flex: 1, background: 'rgba(255, 215, 0, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,215,0,0.3)' }}>
+                <div style={{ flex: 1, background: 'var(--color-warning-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--primary)' }}>
                     <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Empate</div>
                     <div style={{ fontWeight: 800, color: 'var(--primary)' }}>{matchData.probDraw}%</div>
                 </div>
-                <div style={{ flex: 1, background: 'rgba(255, 0, 85, 0.1)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,0,85,0.3)' }}>
+                <div style={{ flex: 1, background: 'var(--color-danger-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-danger)' }}>
                     <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.away.name}</div>
-                    <div style={{ fontWeight: 800, color: 'var(--accent-rd)' }}>{matchData.probAway}%</div>
+                    <div style={{ fontWeight: 800, color: 'var(--color-danger)' }}>{matchData.probAway}%</div>
                 </div>
             </div>
 
             {/* ZONA DE APUESTA */}
-            <div className="glass-card" style={{ marginTop: '1rem', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+            <div className="glass-card" style={{ marginTop: '1rem', border: '1px solid var(--primary)' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', marginBottom: '1rem' }}>
                     <Zap size={20} /> Participar en este Evento
                 </h3>
@@ -187,7 +187,7 @@ export default function Home() {
         <div className="fade-in">
             <h1 className="page-title">🏆 La Polla Mundialista</h1>
             
-            <div className="glass-card" style={{ borderLeft: '4px solid #00F0FF' }}>
+            <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-bl)' }}>
                 <h3 style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     ✅ Sesión Iniciada Exitosamente
                 </h3>
@@ -198,14 +198,14 @@ export default function Home() {
                 title="Radar Tricolor: Selección Colombia" 
                 matchData={colombiaMatch} 
                 icon={Activity} 
-                color="#FFD700" 
+                color="var(--primary)" 
             />
 
             <MatchRadar 
                 title="Radar Global: Mundial y Champions" 
                 matchData={globalMatch} 
                 icon={Globe2} 
-                color="#00F0FF" 
+                color="var(--accent-bl)" 
             />
             
             <div className="glass-card" style={{ marginTop: '2rem' }}>

@@ -73,10 +73,10 @@ export default function Admin() {
                     padding: '0.75rem 1.25rem',
                     marginBottom: '2rem'
                 }}>
-                    <Wifi size={16} color="#00F0FF" />
+                    <Wifi size={16} color="var(--accent-bl)" />
                     <div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Requests diarias a la API</span>
-                        <span style={{ fontWeight: 800, color: '#00F0FF' }}>
+                        <span style={{ fontWeight: 800, color: 'var(--accent-bl)' }}>
                             {apiStatus.requests_current.toLocaleString()} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/ {apiStatus.requests_limit.toLocaleString()}</span>
                         </span>
                     </div>
@@ -90,8 +90,8 @@ export default function Admin() {
 
             {/* PANEL DE SOLICITUDES DE CANCELACIÓN */}
             {cancellationRequests.length > 0 && (
-                <div className="glass-card" style={{ borderColor: 'rgba(255, 51, 102, 0.5)' }}>
-                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: '#FF3366' }}>
+                <div className="glass-card" style={{ borderColor: 'var(--color-danger)' }}>
+                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger)' }}>
                         <XCircle size={20} /> Solicitudes de Cancelación Pendientes
                     </h3>
                     
@@ -139,7 +139,7 @@ export default function Admin() {
             {/* PANEL ÚNICO PARA ADMINISTRADORES */}
             <div className="glass-card">
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle size={20} color="#00FF88" /> Panel de Control de Ingresos
+                    <CheckCircle size={20} color="var(--color-success)" /> Panel de Control de Ingresos
                 </h3>
                 
                 <div className="table-container">
@@ -162,7 +162,7 @@ export default function Admin() {
                             ) : allBets.map((bet) => (
                                 <tr key={bet.id}>
                                     <td>
-                                        <span style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                                        <span style={{ background: 'var(--glass-bg)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                                             {bet.id.slice(0, 8)}...
                                         </span>
                                     </td>
@@ -174,9 +174,9 @@ export default function Admin() {
                                         <button 
                                             onClick={() => toggleStatus(bet.id, bet.status)}
                                             style={{
-                                                background: bet.status === 'PAGADO' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                                                border: `1px solid ${bet.status === 'PAGADO' ? '#00FF88' : 'var(--primary)'}`,
-                                                color: bet.status === 'PAGADO' ? '#00FF88' : 'var(--primary)',
+                                                background: bet.status === 'PAGADO' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                                                border: `1px solid ${bet.status === 'PAGADO' ? 'var(--color-success)' : 'var(--primary)'}`,
+                                                color: bet.status === 'PAGADO' ? 'var(--color-success)' : 'var(--primary)',
                                                 padding: '8px 16px',
                                                 borderRadius: '8px',
                                                 cursor: 'pointer',

@@ -38,7 +38,7 @@ function MatchCard({ match }: { match: MatchResult }) {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0.75rem 0',
-            borderBottom: '1px solid rgba(255,255,255,0.05)'
+            borderBottom: '1px solid var(--glass-border)'
         }}>
             {/* Equipo local */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
@@ -49,7 +49,7 @@ function MatchCard({ match }: { match: MatchResult }) {
 
             {/* Marcador */}
             <div style={{
-                background: 'rgba(255,255,255,0.08)',
+                background: 'var(--glass-bg)',
                 borderRadius: '8px',
                 padding: '4px 12px',
                 fontWeight: 800,
@@ -138,7 +138,7 @@ export default function Resultados() {
             <ResultsSection
                 title="Selección Colombia"
                 icon={Activity}
-                color="#FFD700"
+                color="var(--primary)"
                 matches={colombiaMatches}
                 loading={loading}
             />
@@ -146,7 +146,7 @@ export default function Resultados() {
             <ResultsSection
                 title="UEFA Champions League"
                 icon={Shield}
-                color="#00F0FF"
+                color="var(--accent-bl)"
                 matches={championsMatches}
                 loading={loading}
             />
@@ -154,7 +154,7 @@ export default function Resultados() {
             <ResultsSection
                 title="FIFA World Cup 2026"
                 icon={Globe2}
-                color="#00FF88"
+                color="var(--color-success)"
                 matches={worldcupMatches}
                 loading={loading}
                 emptyMessage="La fase de grupos del Mundial 2026 aún no ha comenzado. Los partidos iniciarán en junio de 2026."
