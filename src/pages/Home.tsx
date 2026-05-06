@@ -47,22 +47,7 @@ function MatchRadar({ title, matchData, icon: Icon, color }: { title: string, ma
                 </div>
             </div>
 
-            <div className="radar-prob">
-                <div style={{ flex: 1, background: 'var(--color-success-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-success)' }}>
-                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.home.name}</div>
-                    <div style={{ fontWeight: 800, color: 'var(--color-success)' }}>{matchData.probHome}%</div>
-                </div>
-                <div style={{ flex: 1, background: 'var(--color-warning-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--primary)' }}>
-                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Empate</div>
-                    <div style={{ fontWeight: 800, color: 'var(--primary)' }}>{matchData.probDraw}%</div>
-                </div>
-                <div style={{ flex: 1, background: 'var(--color-danger-bg)', padding: '10px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-danger)' }}>
-                    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Gana {matchData.teams.away.name}</div>
-                    <div style={{ fontWeight: 800, color: 'var(--color-danger)' }}>{matchData.probAway}%</div>
-                </div>
-            </div>
-
-            {/* AI-NOTE: Zona de apuesta temporalmente deshabilitada */}
+            {/* AI-NOTE: Zona de apuesta y probabilidades temporalmente deshabilitadas */}
         </div>
     );
 }

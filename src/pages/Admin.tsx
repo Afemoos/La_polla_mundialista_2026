@@ -166,6 +166,9 @@ export default function Admin() {
                     {excelSyncing ? <><Loader size={16} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} /> Sincronizando...</> : <><FileSpreadsheet size={16} style={{ marginRight: '6px' }} /> Exportar a Excel (Manual)</>}
                 </button>
             </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '-0.5rem', marginBottom: '1.5rem' }}>
+                Nota: El botón reemplaza la hoja completa de Auditoría evitando duplicados. Extensiones de terceros sí pueden causar duplicados.
+            </p>
 
             {/* CONTADOR API */}
             {apiStatus && (

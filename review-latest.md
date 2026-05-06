@@ -1,27 +1,24 @@
-# Revisión Técnica: Fase 4 (Optimización Admin y Cierre Pre-Partido)
+# Revisión Técnica: Fase 5 (Resolución de Conflictos Operativos)
 
 ## 1. Resumen de la Intervención
-En esta fase (Fase 4), el objetivo fue mejorar la usabilidad del panel administrativo mediante componentes colapsables, permitir la sincronización manual a Excel vía Vercel Serverless Functions sin afectar cuotas de APIs de terceros, y sellar un vacío legal permitiendo el bloqueo automático pre-partido.
+En esta fase (Fase 5), el objetivo fue resolver reportes operativos encontrados en producción: un fallo técnico en el entorno Serverless de Vercel al intentar exportar manualmente, confusiones de UI con extensiones de terceros que duplicaban datos en Excel, reajuste en la economía de tokens del juego, y una limpieza visual en el Home.
 
-**Agente ejecutor:** DeepSeek v4 Pro
+**Estado:** Completado exitosamente.
 
 ## 2. Análisis del Código Implementado
 
-### 2.1 Backend / Infraestructura (GitHub & Vercel)
-- **GitHub Action:** Creó exitosamente el archivo `.github/workflows/sync_excel_manual.yml` con el trigger `workflow_dispatch`. Solo ejecuta `contabilidad.py`, protegiendo de forma inteligente la cuota de peticiones de API-Football.
-- **Vercel Serverless API (`api/trigger-excel-sync.ts`):** Implementó un endpoint seguro usando el estándar Web `Request`/`Response`. Verifica los correos de administrador (seguridad ligera) y se comunica mediante el `GITHUB_PAT`.
-- **Configuración (`vercel.json`):** *Destacable.* El agente tuvo la precaución técnica de añadir un bloque `"rewrites": [{"source": "/((?!api/).*)", "destination": "/index.html"}]`. En aplicaciones SPA como Vite, sin esta exclusión, Vercel interceptaría las llamadas a `/api` devolviendo el `index.html`. Este fue un excelente movimiento proactivo.
+### 2.1 Backend / Serverless (`api/trigger-excel-sync.ts`)
+- **Fix de Vercel:** Se refactorizó exitosamente el endpoint utilizando los tipos oficiales `@vercel/node` (`VercelRequest`, `VercelResponse`). Al usar `req.body` en lugar del método estándar `req.json()`, el botón de exportación manual dejará de lanzar el error *TypeError*, logrando total compatibilidad con el ecosistema backend Node.js de Vercel.
 
-### 2.2 Frontend: Panel de Administración (`Admin.tsx`)
-- **Acordeones Nativos:** Cumplió la regla estricta de no usar librerías pesadas. Creó estados de apertura (`isTokensOpen`, `isUsersOpen`, `isBetsOpen`) apoyados en íconos de *Lucide*. Reorganizó la "Gestión de Tokens" en el tope de la pantalla para máxima eficiencia.
-- **Botón de Sincronización:** Integró el botón "Exportar a Excel (Manual)" conectado exitosamente al backend, con feedback visual.
+### 2.2 Bot de Python (`legacy_python/`)
+- **Economía de Tokens (`fetch_matches.py`):** El agente modificó la constante `TARGET_MATCHES`. Se verificó que los 10 partidos globales ahora cuestan `3` tokens, mientras que los 3 partidos de la Selección Colombia cuestan `5` tokens.
+- **Sello de Tiempo en Excel (`contabilidad.py`):** Se añadió la importación de `datetime` y se agregó una nueva fila al final del "Resumen Financiero" que estampa la hora exacta del servidor bajo la etiqueta `"Última Sincronización"`. Esto brindará claridad absoluta al equipo administrativo sobre la vigencia de los datos en Google Sheets.
 
-### 2.3 Reglas de Negocio Extra (`PollaMundialista.tsx` & Temas)
-- **Bugfix Timestamp:** Solucionó el error que lanzaba Firebase al forzar el bloqueo. Ahora la función `handleLockNow` empaqueta la fecha mediante `Timestamp.fromDate(pastTime)`, logrando compatibilidad total.
-- **Cierre Pre-Partido:** Implementó el cálculo matemático de `hoursUntilMatch`. Si restan menos de 1 hora para el evento, aplica `isPreMatchLocked = true`, cerrando herméticamente la ventana de apuestas incluso si no se habían agotado las 48 horas iniciales. El mensaje en pantalla se actualiza dinámicamente para dar claridad al usuario.
-- **Modo Claro:** Ajustó la lógica en `ThemeContext.tsx` para iniciar por defecto con el modo claro.
+### 2.3 Frontend (`Home.tsx` y `Admin.tsx`)
+- **Limpieza Visual (`Home.tsx`):** Se erradicó por completo el bloque `<div className="radar-prob">` del componente `MatchRadar`. La interfaz del Home ahora es más limpia y menos saturada de información irrelevante.
+- **Aclaración en Admin (`Admin.tsx`):** Se incluyó un bloque de texto discreto (`var(--text-muted)`) bajo el botón de exportar. Este texto servirá como advertencia psicológica y funcional para que los administradores confíen en el botón nativo y desestimen las duplicaciones causadas por automatizaciones de Zapier o Firebase Extensions.
 
 ## 3. Conclusión
-El código proporcionado por DeepSeek v4 Pro en esta Fase 4 es de **excelente calidad**. Siguió minuciosamente el `implementation-plan.md` y resolvió inteligentemente un caso de borde arquitectónico (`vercel.json`) que de otra forma hubiese roto el enrutamiento de la API. 
+Todos los conflictos operativos han sido resueltos según las especificaciones del usuario. El código es seguro y la lógica económica fue ajustada sin requerir alteraciones riesgosas en las reglas de seguridad de Firestore (que ya estaban diseñadas de forma modular). 
 
-El sistema está completamente estable, pulido estéticamente y asegurado contra apuestas de último minuto. El código está listo para ser comiteado y enviado a producción (`main`).
+La aplicación está lista para un `git add .`, `commit` y `push` a producción. No se detectan anomalías.

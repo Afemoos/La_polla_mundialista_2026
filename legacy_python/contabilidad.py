@@ -1,5 +1,6 @@
 import os
 import json
+import datetime
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
@@ -106,7 +107,8 @@ def main():
             ["Dinero Faltante (Pendiente)", total_pendiente, "Deudas de usuarios"],
             ["Bolsa a Repartir", bolsa_repartir, f"Restando {COMISION_CASA*100}% de comisión"],
             ["Ganancia Administrador", ganancia_casa, "Para la casa"],
-            ["Total Tickets Auditados", len(all_bets), ""]
+            ["Total Tickets Auditados", len(all_bets), ""],
+            ["Última Sincronización", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Hora del servidor"],
         ]
         ws_resumen.clear()
         ws_resumen.update(values=resumen_data, range_name="A1")
