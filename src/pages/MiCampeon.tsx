@@ -12,24 +12,32 @@ export default function MiCampeon() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [debugError, setDebugError] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([
-      getUserBracket(currentUser.uid).catch(() => null),
-      Promise.all(['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g).catch(() => [])))
-        .then(groups => groups.flat().sort((a, b) => a.name.localeCompare(b.name)))
-        .catch(() => [] as WorldCupTeam[])
-    ]).then(([b, t]) => {
-      setBracket(b);
-      setTeams(t);
-      setDebugError('');
-      if (b?.campeon) {
-        setSelectedTeam(t.find(team => team.apiId === b.campeon!.apiId) || null);
+    setLoading(true);
+    loadData();
+    async function loadData() {
+      let bracketData: Bracket | null = null;
+      try {
+        bracketData = await getUserBracket(currentUser!.uid);
+        setBracket(bracketData);
+      } catch { /* bracket might not exist yet, OK */ }
+      try {
+        const groups = await Promise.all(
+          ['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g))
+        );
+        const t = groups.flat().sort((a, b) => a.name.localeCompare(b.name));
+        setTeams(t);
+        if (bracketData?.campeon && t.length > 0) {
+          const found = t.find(team => team.apiId === bracketData.campeon!.apiId);
+          if (found) setSelectedTeam(found);
+        }
+      } catch (e: any) {
+        setError('Error al cargar equipos: ' + (e?.message || ''));
       }
-    }).catch((e: Error) => { setError('Error al cargar datos'); setDebugError(e.message); })
-    .finally(() => setLoading(false));
+      setLoading(false);
+    }
   }, [currentUser]);
 
   const handleSave = async () => {
@@ -93,7 +101,7 @@ export default function MiCampeon() {
         )}
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Selecciona un equipo</label>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Selecciona un equipo ({teams.length} disponibles)</label>
           <select
             value={selectedTeam?.apiId || ''}
             onChange={e => {
@@ -119,7 +127,6 @@ export default function MiCampeon() {
         </div>
 
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
-        {debugError && <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>{debugError}</p>}
 
         <button
           onClick={handleSave}

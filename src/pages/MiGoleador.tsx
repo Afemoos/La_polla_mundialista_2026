@@ -1,64 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserBracket, saveUserBracket, searchPlayers } from '../services/firestore';
+import { getUserBracket, saveUserBracket } from '../services/firestore';
 import type { Bracket, FlatPlayer } from '../types/firestore';
 import { Target, Save, Search } from 'lucide-react';
+import { collection, getDocs, limit as fsLimit } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function MiGoleador() {
   const { currentUser } = useAuth() || {};
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [results, setResults] = useState<FlatPlayer[]>([]);
+  const [allPlayers, setAllPlayers] = useState<FlatPlayer[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<FlatPlayer | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [debugError, setDebugError] = useState('');
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
-    setLoading(true);
-    getUserBracket(currentUser.uid).then(b => {
+    Promise.all([
+      getUserBracket(currentUser.uid).catch(() => null),
+      getDocs(query(collection(db, 'flat_players'), fsLimit(2000)))
+        .then(snap => snap.docs.map(d => ({ ...d.data() })) as FlatPlayer[])
+        .catch((e: Error) => { setLoadError(e.message); return []; })
+    ]).then(([b, players]) => {
       setBracket(b);
-      if (b?.goleador) {
-        setSelectedPlayer({
-          apiId: b.goleador.apiId,
-          name: b.goleador.name,
-          teamName: b.goleador.teamName,
-          photo: b.goleador.photo,
-          age: 0, number: null, position: '', teamApiId: 0, teamCode: '', teamLogo: '',
-        });
+      setAllPlayers(players.length > 0 ? players : []);
+      if (b?.goleador && players.length > 0) {
+        const found = players.find(p => p.apiId === b.goleador!.apiId);
+        if (found) setSelectedPlayer(found);
       }
     }).finally(() => setLoading(false));
   }, [currentUser]);
 
-  useEffect(() => {
-    if (searchTerm.length < 2) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => {
-      searchPlayers(searchTerm, 15)
-        .then(r => { setResults(r); setShowResults(true); setDebugError(''); })
-        .catch((e: Error) => { setResults([]); setShowResults(true); setDebugError(e.message); });
-    }, 250);
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
-  }, [searchTerm]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setShowResults(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const filteredPlayers = useMemo(() => {
+    if (searchTerm.length < 2 || allPlayers.length === 0) return [];
+    const term = searchTerm.toLowerCase();
+    return allPlayers.filter(p => p.name.toLowerCase().includes(term)).slice(0, 20);
+  }, [searchTerm, allPlayers]);
 
   const handleSelect = (player: FlatPlayer) => {
     setSelectedPlayer(player);
@@ -116,6 +97,12 @@ export default function MiGoleador() {
           10 tokens — selecciona el jugador que crees que marcará más goles
         </p>
 
+        {loadError && (
+          <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.85rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>
+            Error al cargar jugadores: {loadError}
+          </p>
+        )}
+
         {bracket?.goleador && (
           <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-success-bg)', borderRadius: '12px', border: '1px solid var(--color-success)' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Tu predicción actual</p>
@@ -129,15 +116,15 @@ export default function MiGoleador() {
           </div>
         )}
 
-        <div ref={wrapperRef} style={{ marginBottom: '1.5rem', position: 'relative' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Buscar jugador</label>
+        <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Buscar jugador ({allPlayers.length} disponibles)</label>
           <div style={{ position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
               value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setSelectedPlayer(null); }}
-              onFocus={() => { if (results.length > 0) setShowResults(true); }}
+              onChange={e => { setSearchTerm(e.target.value); setSelectedPlayer(null); setShowResults(true); }}
+              onFocus={() => { if (filteredPlayers.length > 0 || searchTerm.length >= 2) setShowResults(true); }}
               placeholder="Escribe el nombre del jugador..."
               style={{
                 width: '100%',
@@ -152,7 +139,7 @@ export default function MiGoleador() {
             />
           </div>
 
-          {showResults && results.length > 0 && (
+          {showResults && filteredPlayers.length > 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -167,7 +154,7 @@ export default function MiGoleador() {
               overflowY: 'auto',
               boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
             }}>
-              {results.map(p => (
+              {filteredPlayers.map(p => (
                 <button
                   key={p.apiId}
                   onClick={() => handleSelect(p)}
@@ -199,7 +186,7 @@ export default function MiGoleador() {
             </div>
           )}
 
-          {showResults && searchTerm.length >= 2 && results.length === 0 && (
+          {showResults && searchTerm.length >= 2 && filteredPlayers.length === 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -221,7 +208,6 @@ export default function MiGoleador() {
         </div>
 
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
-        {debugError && <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>Debug: {debugError}</p>}
 
         <button
           onClick={handleSave}
