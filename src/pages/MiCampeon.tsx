@@ -196,6 +196,26 @@ export default function MiCampeon() {
           </div>
         </div>
 
+        {selectedTeam && !bracket?.campeon && (
+          <div style={{ marginBottom: '1.5rem', padding: '1.2rem', background: 'var(--color-warning-bg)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
+              <img src={selectedTeam.logo} alt="" style={{ width: '48px', height: '48px' }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{selectedTeam.name}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{selectedTeam.country} · {selectedTeam.code}</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <div><strong style={{ color: 'var(--text-main)' }}>Fundación:</strong> {selectedTeam.founded || 'N/A'}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Grupo:</strong> {selectedTeam.group}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Estadio:</strong> {selectedTeam.venue?.name || 'N/A'}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Ciudad:</strong> {selectedTeam.venue?.city || 'N/A'}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Capacidad:</strong> {selectedTeam.venue?.capacity?.toLocaleString() || 'N/A'}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Superficie:</strong> {selectedTeam.venue?.surface || 'N/A'}</div>
+            </div>
+          </div>
+        )}
+
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
 
         <button

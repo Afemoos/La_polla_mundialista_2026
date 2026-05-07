@@ -267,6 +267,24 @@ export default function MiGoleador() {
           )}
         </div>
 
+        {selectedPlayer && !bracket?.goleador && (
+          <div style={{ marginBottom: '1.5rem', padding: '1.2rem', background: 'var(--color-warning-bg)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
+              <img src={selectedPlayer.photo} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{selectedPlayer.name}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{selectedTeam?.name || ''}</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <div><strong style={{ color: 'var(--text-main)' }}>Posición:</strong> {selectedPlayer.position}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Edad:</strong> {selectedPlayer.age}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Número:</strong> {selectedPlayer.number ?? 'N/A'}</div>
+              <div><strong style={{ color: 'var(--text-main)' }}>Equipo:</strong> {selectedTeam?.name || 'N/A'}</div>
+            </div>
+          </div>
+        )}
+
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
 
         <button
