@@ -21,7 +21,7 @@ export default function Admin() {
     const [isResetOpen, setIsResetOpen] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
     const [resetError, setResetError] = useState('');
-    const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number } | null>(null);
+    const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number; duplicatesRemoved: number } | null>(null);
 
     useEffect(() => {
         const q = getAllPredictionsQuery();
@@ -140,7 +140,45 @@ export default function Admin() {
                 tokensReset += batch.length;
             }
 
-            setResetDone({ predictions: deletedPredictions, brackets: deletedBrackets, tokensReset });
+            // Eliminar usuarios duplicados (mismo email, diferentes UID)
+            // AI-NOTE: Ocurre cuando un usuario elimina y re-crea su cuenta de Google
+            let duplicatesRemoved = 0;
+            const usersForDedup = await getDocs(collection(db, 'users'));
+            const byEmail: Record<string, { uid: string; tokens: number }[]> = {};
+            usersForDedup.forEach(d => {
+                const data = d.data();
+                const email = data.email || '';
+                if (!byEmail[email]) byEmail[email] = [];
+                byEmail[email].push({ uid: d.id, tokens: data.tokens || 0 });
+            });
+            const toDelete: string[] = [];
+            for (const [email, entries] of Object.entries(byEmail)) {
+                if (entries.length <= 1) continue;
+                // Conservar el que tenga más tokens; si hay empate, el primero
+                entries.sort((a, b) => b.tokens - a.tokens);
+                const [keep, ...remove] = entries;
+                remove.forEach(r => toDelete.push(r.uid));
+            }
+            if (toDelete.length > 0) {
+                const dedupBatches: string[][] = [];
+                let currentDedupBatch: string[] = [];
+                toDelete.forEach(id => {
+                    currentDedupBatch.push(id);
+                    if (currentDedupBatch.length >= 500) {
+                        dedupBatches.push(currentDedupBatch);
+                        currentDedupBatch = [];
+                    }
+                });
+                if (currentDedupBatch.length > 0) dedupBatches.push(currentDedupBatch);
+                for (const batch of dedupBatches) {
+                    const wb = writeBatch(db);
+                    batch.forEach(id => wb.delete(doc(db, 'users', id)));
+                    await wb.commit();
+                    duplicatesRemoved += batch.length;
+                }
+            }
+
+            setResetDone({ predictions: deletedPredictions, brackets: deletedBrackets, tokensReset, duplicatesRemoved });
         } catch (e: any) {
             setResetError('Error: ' + (e?.message || 'Desconocido'));
         }
@@ -454,7 +492,7 @@ export default function Admin() {
                         <div style={{ background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
                             <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '0.5rem' }}>⚠️ Acción irreversible</p>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                                Esta acción eliminará <strong>todas las predicciones</strong> (colección <code>predictions</code>), <strong>todos los brackets</strong> (colección <code>brackets</code>) y <strong>reseteará los tokens de todos los usuarios a 0</strong>.
+                                Esta acción: (1) eliminará todas las <strong>predicciones</strong> y <strong>brackets</strong>, (2) reseteará los <strong>tokens</strong> de todos los usuarios a 0, (3) eliminará <strong>usuarios duplicados</strong> (mismo email, distinto UID).
                                 No se borrarán equipos, jugadores ni configuraciones del sistema.
                             </p>
                         </div>
@@ -463,7 +501,7 @@ export default function Admin() {
                         )}
                         {resetDone !== null && (
                             <p style={{ color: 'var(--color-success)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                                ✅ Limpieza completada: {resetDone.predictions} predicciones, {resetDone.brackets} brackets eliminados, {resetDone.tokensReset} usuarios con tokens a 0.
+                                ✅ Limpieza completada: {resetDone.predictions} predicciones, {resetDone.brackets} brackets eliminados, {resetDone.tokensReset} tokens reseteados, {resetDone.duplicatesRemoved} duplicados eliminados.
                             </p>
                         )}
                         <button
