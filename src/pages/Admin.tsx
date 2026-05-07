@@ -21,7 +21,7 @@ export default function Admin() {
     const [isResetOpen, setIsResetOpen] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
     const [resetError, setResetError] = useState('');
-    const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number } | null>(null);
+    const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number } | null>(null);
 
     useEffect(() => {
         const q = getAllPredictionsQuery();
@@ -119,7 +119,28 @@ export default function Admin() {
                 deletedBrackets += batch.length;
             }
 
-            setResetDone({ predictions: deletedPredictions, brackets: deletedBrackets });
+            // Resetear tokens de todos los usuarios a 0
+            let tokensReset = 0;
+            const usersSnap = await getDocs(collection(db, 'users'));
+            const userBatches: string[][] = [];
+            let currentUserBatch: string[] = [];
+            usersSnap.forEach(d => {
+                currentUserBatch.push(d.id);
+                if (currentUserBatch.length >= 500) {
+                    userBatches.push(currentUserBatch);
+                    currentUserBatch = [];
+                }
+            });
+            if (currentUserBatch.length > 0) userBatches.push(currentUserBatch);
+
+            for (const batch of userBatches) {
+                const wb = writeBatch(db);
+                batch.forEach(id => wb.update(doc(db, 'users', id), { tokens: 0 }));
+                await wb.commit();
+                tokensReset += batch.length;
+            }
+
+            setResetDone({ predictions: deletedPredictions, brackets: deletedBrackets, tokensReset });
         } catch (e: any) {
             setResetError('Error: ' + (e?.message || 'Desconocido'));
         }
@@ -433,8 +454,8 @@ export default function Admin() {
                         <div style={{ background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
                             <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '0.5rem' }}>⚠️ Acción irreversible</p>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                                Esta acción eliminará <strong>todas las predicciones</strong> (colección <code>predictions</code>) y <strong>todos los brackets</strong> (colección <code>brackets</code>).
-                                No se borrarán equipos, jugadores, usuarios ni configuraciones del sistema.
+                                Esta acción eliminará <strong>todas las predicciones</strong> (colección <code>predictions</code>), <strong>todos los brackets</strong> (colección <code>brackets</code>) y <strong>reseteará los tokens de todos los usuarios a 0</strong>.
+                                No se borrarán equipos, jugadores ni configuraciones del sistema.
                             </p>
                         </div>
                         {resetError && (
@@ -442,7 +463,7 @@ export default function Admin() {
                         )}
                         {resetDone !== null && (
                             <p style={{ color: 'var(--color-success)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                                ✅ Limpieza completada: {resetDone.predictions} predicciones y {resetDone.brackets} brackets eliminados.
+                                ✅ Limpieza completada: {resetDone.predictions} predicciones, {resetDone.brackets} brackets eliminados, {resetDone.tokensReset} usuarios con tokens a 0.
                             </p>
                         )}
                         <button
