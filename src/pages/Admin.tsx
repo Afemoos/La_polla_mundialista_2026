@@ -152,11 +152,11 @@ export default function Admin() {
                 byEmail[email].push({ uid: d.id, tokens: data.tokens || 0 });
             });
             const toDelete: string[] = [];
-            for (const [email, entries] of Object.entries(byEmail)) {
+            for (const [_email, entries] of Object.entries(byEmail)) {
                 if (entries.length <= 1) continue;
                 // Conservar el que tenga más tokens; si hay empate, el primero
                 entries.sort((a, b) => b.tokens - a.tokens);
-                const [keep, ...remove] = entries;
+                const [, ...remove] = entries;
                 remove.forEach(r => toDelete.push(r.uid));
             }
             if (toDelete.length > 0) {
