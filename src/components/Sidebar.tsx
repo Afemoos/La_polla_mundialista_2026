@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, ListChecks, LogOut, CalendarDays, Settings, Globe, Moon, Sun, Coins } from 'lucide-react';
+import { Trophy, ListChecks, LogOut, CalendarDays, Settings, Globe, Moon, Sun, Coins, Swords, Crown, Target, Star, ChevronDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -15,6 +15,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const authCounter = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [tokens, setTokens] = useState(0);
+  const [pollaOpen, setPollaOpen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     if (!authCounter?.currentUser) return;
@@ -25,6 +27,13 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     });
     return () => unsub();
   }, [authCounter?.currentUser]);
+
+  // AI-NOTE: Auto-expandir menu Polla cuando estemos en una subpagina
+  useEffect(() => {
+    if (location.pathname.startsWith('/polla-mundialista')) {
+      setPollaOpen(true);
+    }
+  }, [location.pathname]);
 
   const handleLinkClick = () => {
     setIsOpen(false);
@@ -46,12 +55,54 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <Trophy size={20} /> Principal
         </NavLink>
 
+        {/* Polla mundialista — menú colapsable */}
+        <button
+          className={`nav-item nav-collapse-btn ${pollaOpen ? 'open' : ''}`}
+          onClick={() => setPollaOpen(!pollaOpen)}
+        >
+          <Globe size={20} /> Polla mundialista
+          <ChevronDown size={16} className={`collapse-arrow ${pollaOpen ? 'rotated' : ''}`} />
+        </button>
+
+        {pollaOpen && (
+          <div className="nav-submenu">
+            <NavLink
+              to="/polla-mundialista/mi-polla"
+              onClick={handleLinkClick}
+              className={({ isActive }) => isActive ? 'nav-item sub active' : 'nav-item sub'}
+            >
+              <Trophy size={18} /> Mi Polla
+            </NavLink>
+            <NavLink
+              to="/polla-mundialista/mis-16"
+              onClick={handleLinkClick}
+              className={({ isActive }) => isActive ? 'nav-item sub active' : 'nav-item sub'}
+            >
+              <Swords size={18} /> Mis 16
+            </NavLink>
+            <NavLink
+              to="/polla-mundialista/mi-campeon"
+              onClick={handleLinkClick}
+              className={({ isActive }) => isActive ? 'nav-item sub active' : 'nav-item sub'}
+            >
+              <Crown size={18} /> Mi Campeón
+            </NavLink>
+            <NavLink
+              to="/polla-mundialista/mi-goleador"
+              onClick={handleLinkClick}
+              className={({ isActive }) => isActive ? 'nav-item sub active' : 'nav-item sub'}
+            >
+              <Target size={18} /> Mi Goleador
+            </NavLink>
+          </div>
+        )}
+
         <NavLink
-          to="/polla-mundialista"
+          to="/champions"
           onClick={handleLinkClick}
           className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
         >
-          <Globe size={20} /> Polla mundialista
+          <Star size={20} /> Champions
         </NavLink>
 
         <NavLink
@@ -61,7 +112,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         >
           <CalendarDays size={20} /> Resultados
         </NavLink>
-
 
         <NavLink
           to="/mis-apuestas"

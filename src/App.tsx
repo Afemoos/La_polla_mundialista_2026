@@ -6,6 +6,11 @@ import MisApuestas from './pages/MisApuestas';
 import Resultados from './pages/Resultados';
 import Admin from './pages/Admin';
 import PollaMundialista from './pages/PollaMundialista';
+import PollaLayout from './pages/PollaLayout';
+import Mis16 from './pages/Mis16';
+import MiCampeon from './pages/MiCampeon';
+import MiGoleador from './pages/MiGoleador';
+import Champions from './pages/Champions';
 import { useAuth } from './contexts/AuthContext';
 import { Menu } from 'lucide-react';
 import './index.css';
@@ -32,7 +37,6 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app-container">
-        {/* Header móvil visible solo en < 768px */}
         <div className="mobile-header">
           <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
             <Menu size={28} />
@@ -40,7 +44,6 @@ function App() {
           <div className="mobile-logo">🏆 La Polla</div>
         </div>
 
-        {/* Overlay oscuro para cerrar el menú */}
         {isSidebarOpen && (
           <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
         )}
@@ -50,7 +53,14 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/polla-mundialista" element={<PollaMundialista />} />
+            <Route path="/polla-mundialista" element={<PollaLayout />}>
+              <Route index element={<Navigate to="mi-polla" replace />} />
+              <Route path="mi-polla" element={<PollaMundialista />} />
+              <Route path="mis-16" element={<Mis16 />} />
+              <Route path="mi-campeon" element={<MiCampeon />} />
+              <Route path="mi-goleador" element={<MiGoleador />} />
+            </Route>
+            <Route path="/champions" element={<Champions />} />
             <Route path="/resultados" element={<Resultados />} />
             <Route path="/mis-apuestas" element={<MisApuestas />} />
             {authContext.isAdmin && (

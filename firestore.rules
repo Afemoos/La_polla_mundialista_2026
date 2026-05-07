@@ -94,5 +94,36 @@ service cloud.firestore {
       
       allow delete: if isAdmin();
     }
+
+    match /Teams/{tournament}/{group}/{teamDoc} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+
+      match /Players/{playerDoc} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    match /brackets/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.userId == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        (!('score' in request.resource.data) || request.resource.data.score == null) &&
+        (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == null) &&
+        (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == null);
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.userId == userId &&
+        (!('score' in request.resource.data) || request.resource.data.score == resource.data.score) &&
+        (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == resource.data.campeonResult) &&
+        (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == resource.data.goleadorResult);
+      allow delete: if isAdmin();
+    }
+
+    match /flat_players/{playerId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
