@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getUserBracket, saveUserBracket } from '../services/firestore';
 import type { Bracket, FlatPlayer } from '../types/firestore';
 import { Target, Save, Search } from 'lucide-react';
-import { collection, getDocs, limit as fsLimit } from 'firebase/firestore';
+import { collection, getDocs, limit as fsLimit, query } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export default function MiGoleador() {
@@ -23,8 +23,8 @@ export default function MiGoleador() {
     Promise.all([
       getUserBracket(currentUser.uid).catch(() => null),
       getDocs(query(collection(db, 'flat_players'), fsLimit(2000)))
-        .then(snap => snap.docs.map(d => ({ ...d.data() })) as FlatPlayer[])
-        .catch((e: Error) => { setLoadError(e.message); return []; })
+        .then(snap => snap.docs.map(d => d.data() as FlatPlayer))
+        .catch((e: Error) => { setLoadError(e.message); return [] as FlatPlayer[]; })
     ]).then(([b, players]) => {
       setBracket(b);
       setAllPlayers(players.length > 0 ? players : []);
