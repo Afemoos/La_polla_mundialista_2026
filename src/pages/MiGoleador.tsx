@@ -1,54 +1,72 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserBracket, saveUserBracket } from '../services/firestore';
-import type { Bracket, FlatPlayer } from '../types/firestore';
-import { Target, Save, Search } from 'lucide-react';
-import { collection, getDocs, limit as fsLimit, query } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getUserBracket, saveUserBracket, getTeamsByGroup, getTeamPlayers } from '../services/firestore';
+import type { Bracket, WorldCupTeam, Player } from '../types/firestore';
+import { Target, Save, ChevronDown } from 'lucide-react';
+
+interface TeamWithId extends WorldCupTeam {
+  id?: string;
+}
+
+const GROUPS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
 export default function MiGoleador() {
   const { currentUser } = useAuth() || {};
   const [bracket, setBracket] = useState<Bracket | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [allPlayers, setAllPlayers] = useState<FlatPlayer[]>([]);
-  const [selectedPlayer, setSelectedPlayer] = useState<FlatPlayer | null>(null);
-  const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Cascading selects
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [teams, setTeams] = useState<TeamWithId[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<TeamWithId | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
-    Promise.all([
-      getUserBracket(currentUser.uid).catch(() => null),
-      getDocs(query(collection(db, 'flat_players'), fsLimit(2000)))
-        .then(snap => snap.docs.map(d => d.data() as FlatPlayer))
-        .catch((e: Error) => { setLoadError(e.message); return [] as FlatPlayer[]; })
-    ]).then(([b, players]) => {
-      setBracket(b);
-      setAllPlayers(players.length > 0 ? players : []);
-      if (b?.goleador && players.length > 0) {
-        const found = players.find(p => p.apiId === b.goleador!.apiId);
-        if (found) setSelectedPlayer(found);
-      }
-    }).finally(() => setLoading(false));
+    getUserBracket(currentUser.uid)
+      .then(b => { setBracket(b); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [currentUser]);
 
-  const filteredPlayers = useMemo(() => {
-    if (searchTerm.length < 2 || allPlayers.length === 0) return [];
-    const term = searchTerm.toLowerCase();
-    return allPlayers.filter(p => p.name.toLowerCase().includes(term)).slice(0, 20);
-  }, [searchTerm, allPlayers]);
+  const handleGroupChange = async (group: string) => {
+    setSelectedGroup(group);
+    setSelectedTeam(null);
+    setPlayers([]);
+    setSelectedPlayer(null);
+    if (!group) { setTeams([]); return; }
+    setLoadingTeams(true);
+    try {
+      const t = await getTeamsByGroup(group);
+      setTeams(t as TeamWithId[]);
+    } catch {
+      setTeams([]);
+    }
+    setLoadingTeams(false);
+  };
 
-  const handleSelect = (player: FlatPlayer) => {
-    setSelectedPlayer(player);
-    setSearchTerm(player.name);
-    setShowResults(false);
+  const handleTeamChange = async (team: TeamWithId | null) => {
+    setSelectedTeam(team);
+    setPlayers([]);
+    setSelectedPlayer(null);
+    if (!team || !selectedGroup || !team.id) return;
+    setLoadingPlayers(true);
+    try {
+      const p = await getTeamPlayers(team.id, selectedGroup);
+      setPlayers(p);
+    } catch {
+      setPlayers([]);
+    }
+    setLoadingPlayers(false);
   };
 
   const handleSave = async () => {
-    if (!currentUser || !selectedPlayer) return;
+    if (!currentUser || !selectedPlayer || !selectedTeam) return;
     setSaving(true);
     setError('');
     const alreadyPaid = bracket?.tokensSpent?.goleador && bracket.tokensSpent.goleador > 0;
@@ -57,14 +75,14 @@ export default function MiGoleador() {
         currentUser.uid,
         {
           email: currentUser.email || '',
-          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedPlayer.teamName, photo: selectedPlayer.photo },
+          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedTeam.name, photo: selectedPlayer.photo },
         },
         alreadyPaid ? undefined : { field: 'goleador', amount: 10 }
       );
       setBracket(prev => {
         const updated: Bracket = {
           ...(prev || {} as Bracket),
-          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedPlayer.teamName, photo: selectedPlayer.photo },
+          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedTeam.name, photo: selectedPlayer.photo },
           userId: currentUser.uid,
           email: currentUser.email || '',
           matches: prev?.matches || [],
@@ -97,12 +115,6 @@ export default function MiGoleador() {
           10 tokens — selecciona el jugador que crees que marcará más goles
         </p>
 
-        {loadError && (
-          <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.85rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>
-            Error al cargar jugadores: {loadError}
-          </p>
-        )}
-
         {bracket?.goleador && (
           <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-success-bg)', borderRadius: '12px', border: '1px solid var(--color-success)' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Tu predicción actual</p>
@@ -116,94 +128,82 @@ export default function MiGoleador() {
           </div>
         )}
 
-        <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Buscar jugador ({allPlayers.length} disponibles)</label>
-          <div style={{ position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setSelectedPlayer(null); setShowResults(true); }}
-              onFocus={() => { if (filteredPlayers.length > 0 || searchTerm.length >= 2) setShowResults(true); }}
-              placeholder="Escribe el nombre del jugador..."
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 40px',
-                borderRadius: '10px',
-                border: '1px solid var(--glass-border)',
-                background: 'var(--input-bg)',
-                color: 'var(--text-main)',
-                fontSize: '1rem',
-                fontFamily: 'inherit',
-              }}
-            />
-          </div>
+        {/* Paso 1: Grupo */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>1. Selecciona el grupo</label>
+          <select
+            value={selectedGroup}
+            onChange={e => handleGroupChange(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">-- Grupo --</option>
+            {GROUPS.map(g => <option key={g} value={g}>Grupo {g}</option>)}
+          </select>
+        </div>
 
-          {showResults && filteredPlayers.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 50,
-              background: 'var(--bg-card)',
-              border: '1px solid var(--glass-border)',
-              borderRadius: '10px',
-              marginTop: '4px',
-              maxHeight: '280px',
-              overflowY: 'auto',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            }}>
-              {filteredPlayers.map(p => (
-                <button
-                  key={p.apiId}
-                  onClick={() => handleSelect(p)}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '0.6rem 1rem',
-                    border: 'none',
-                    borderBottom: '1px solid var(--glass-border)',
-                    background: 'transparent',
-                    color: 'var(--text-main)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '0.95rem',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-bg)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <img src={p.photo} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{p.teamName}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+        {/* Paso 2: Equipo */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            2. Selecciona el equipo
+            {loadingTeams && <span style={{ marginLeft: '8px' }}>Cargando...</span>}
+          </label>
+          <select
+            value={selectedTeam?.apiId || ''}
+            onChange={e => {
+              const t = teams.find(t => t.apiId === Number(e.target.value));
+              handleTeamChange(t || null);
+            }}
+            disabled={!selectedGroup || teams.length === 0}
+            style={selectStyle}
+          >
+            <option value="">-- Equipo --</option>
+            {teams.map(t => (
+              <option key={t.apiId} value={t.apiId}>{t.name}</option>
+            ))}
+          </select>
+        </div>
 
-          {showResults && searchTerm.length >= 2 && filteredPlayers.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 50,
-              background: 'var(--bg-card)',
-              border: '1px solid var(--glass-border)',
-              borderRadius: '10px',
-              marginTop: '4px',
-              padding: '1rem',
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              fontSize: '0.9rem',
-            }}>
-              No se encontraron jugadores
+        {/* Paso 3: Jugador */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            3. Selecciona el jugador
+            {loadingPlayers && <span style={{ marginLeft: '8px' }}>Cargando...</span>}
+          </label>
+          {players.length > 0 ? (
+            <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+              {players.map(p => {
+                const isSelected = selectedPlayer?.apiId === p.apiId;
+                return (
+                  <button
+                    key={p.apiId}
+                    onClick={() => setSelectedPlayer(p)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '0.6rem 0.8rem',
+                      border: 'none',
+                      borderBottom: '1px solid var(--glass-border)',
+                      background: isSelected ? 'var(--color-warning-bg)' : 'transparent',
+                      color: 'var(--text-main)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <img src={p.photo} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <span>{p.name}</span>
+                    {isSelected && <ChevronDown size={14} style={{ marginLeft: 'auto', color: 'var(--primary)' }} />}
+                  </button>
+                );
+              })}
             </div>
+          ) : selectedTeam ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.5rem' }}>No hay jugadores disponibles para este equipo</p>
+          ) : (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.5rem' }}>Selecciona primero un equipo</p>
           )}
         </div>
 
@@ -222,3 +222,14 @@ export default function MiGoleador() {
     </div>
   );
 }
+
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.7rem 1rem',
+  borderRadius: '10px',
+  border: '1px solid var(--glass-border)',
+  background: 'var(--input-bg)',
+  color: 'var(--text-main)',
+  fontSize: '1rem',
+  fontFamily: 'inherit',
+};

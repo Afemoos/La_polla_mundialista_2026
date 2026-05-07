@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserBracket, saveUserBracket, getTeamsByGroup } from '../services/firestore';
 import type { Bracket, WorldCupTeam } from '../types/firestore';
-import { Crown, Save } from 'lucide-react';
+import { Crown, Save, ChevronDown } from 'lucide-react';
 
 export default function MiCampeon() {
   const { currentUser } = useAuth() || {};
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [teams, setTeams] = useState<WorldCupTeam[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<WorldCupTeam | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -39,6 +41,16 @@ export default function MiCampeon() {
       setLoading(false);
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSave = async () => {
     if (!currentUser || !selectedTeam) return;
@@ -101,29 +113,87 @@ export default function MiCampeon() {
         )}
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Selecciona un equipo ({teams.length} disponibles)</label>
-          <select
-            value={selectedTeam?.apiId || ''}
-            onChange={e => {
-              const t = teams.find(t => t.apiId === Number(e.target.value));
-              setSelectedTeam(t || null);
-            }}
-            style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              borderRadius: '10px',
-              border: '1px solid var(--glass-border)',
-              background: 'var(--input-bg)',
-              color: 'var(--text-main)',
-              fontSize: '1rem',
-              fontFamily: 'inherit',
-            }}
-          >
-            <option value="">-- Selecciona --</option>
-            {teams.map(t => (
-              <option key={t.apiId} value={t.apiId}>{t.name}</option>
-            ))}
-          </select>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Selecciona un equipo
+          </label>
+
+          {/* Custom dropdown with flags */}
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '0.7rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid var(--glass-border)',
+                background: 'var(--input-bg)',
+                color: selectedTeam ? 'var(--text-main)' : 'var(--text-muted)',
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              {selectedTeam ? (
+                <>
+                  <img src={selectedTeam.logo} alt="" style={{ width: '24px', height: '24px' }} />
+                  <span>{selectedTeam.name}</span>
+                </>
+              ) : (
+                <span>-- Selecciona --</span>
+              )}
+              <ChevronDown size={18} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+            </button>
+
+            {dropdownOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 50,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: '10px',
+                marginTop: '4px',
+                maxHeight: '280px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              }}>
+                {teams.map(t => {
+                  const isSel = selectedTeam?.apiId === t.apiId;
+                  return (
+                    <button
+                      key={t.apiId}
+                      onClick={() => { setSelectedTeam(t); setDropdownOpen(false); }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '0.6rem 1rem',
+                        border: 'none',
+                        borderBottom: '1px solid var(--glass-border)',
+                        background: isSel ? 'var(--color-warning-bg)' : 'transparent',
+                        color: 'var(--text-main)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '0.95rem',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-bg)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = isSel ? 'var(--color-warning-bg)' : 'transparent')}
+                    >
+                      <img src={t.logo} alt="" style={{ width: '22px', height: '22px' }} />
+                      <span>{t.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
