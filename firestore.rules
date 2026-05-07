@@ -75,6 +75,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /system/round_of_32_matches {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /predictions/{predictionId} {
       allow read: if isAuthenticated();
 
