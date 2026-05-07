@@ -87,6 +87,18 @@ export async function getTeamPlayers(teamDocId: string, group: string): Promise<
   })) as unknown as Player[];
 }
 
+// AI-NOTE: Cache de equipos a nivel de módulo para evitar 12 lecturas en cada navegación
+let cachedTeams: WorldCupTeam[] | null = null;
+
+export async function getAllTeams(): Promise<WorldCupTeam[]> {
+  if (cachedTeams) return cachedTeams;
+  const groups = await Promise.all(
+    ['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g))
+  );
+  cachedTeams = groups.flat().sort((a, b) => a.name.localeCompare(b.name));
+  return cachedTeams;
+}
+
 export async function getUserBracket(userId: string): Promise<Bracket | null> {
   const snap = await getDoc(doc(db, 'brackets', userId));
   if (!snap.exists()) return null;

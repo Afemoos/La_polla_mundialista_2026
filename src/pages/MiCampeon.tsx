@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserBracket, saveUserBracket, getTeamsByGroup } from '../services/firestore';
+import { getUserBracket, saveUserBracket, getAllTeams } from '../services/firestore';
 import type { Bracket, WorldCupTeam } from '../types/firestore';
 import { Crown, Save, ChevronDown } from 'lucide-react';
 
@@ -26,10 +26,7 @@ export default function MiCampeon() {
         setBracket(bracketData);
       } catch { /* bracket might not exist yet, OK */ }
       try {
-        const groups = await Promise.all(
-          ['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g))
-        );
-        const t = groups.flat().sort((a, b) => a.name.localeCompare(b.name));
+        const t = await getAllTeams();
         setTeams(t);
         if (bracketData?.campeon && t.length > 0) {
           const found = t.find(team => team.apiId === bracketData.campeon!.apiId);
