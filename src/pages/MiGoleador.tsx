@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserBracket, saveUserBracket, getTeamsByGroup, getTeamPlayers } from '../services/firestore';
 import type { Bracket, WorldCupTeam, Player } from '../types/firestore';
@@ -15,16 +15,19 @@ export default function MiGoleador() {
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Cascading selects
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [groupOpen, setGroupOpen] = useState(false);
   const [teams, setTeams] = useState<TeamWithId[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<TeamWithId | null>(null);
+  const [teamOpen, setTeamOpen] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const groupRef = useRef<HTMLDivElement>(null);
+  const teamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -34,8 +37,18 @@ export default function MiGoleador() {
       .finally(() => setLoading(false));
   }, [currentUser]);
 
-  const handleGroupChange = async (group: string) => {
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (groupRef.current && !groupRef.current.contains(e.target as Node)) setGroupOpen(false);
+      if (teamRef.current && !teamRef.current.contains(e.target as Node)) setTeamOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleGroupSelect = async (group: string) => {
     setSelectedGroup(group);
+    setGroupOpen(false);
     setSelectedTeam(null);
     setPlayers([]);
     setSelectedPlayer(null);
@@ -50,8 +63,9 @@ export default function MiGoleador() {
     setLoadingTeams(false);
   };
 
-  const handleTeamChange = async (team: TeamWithId | null) => {
+  const handleTeamSelect = async (team: TeamWithId | null) => {
     setSelectedTeam(team);
+    setTeamOpen(false);
     setPlayers([]);
     setSelectedPlayer(null);
     if (!team || !selectedGroup || !team.id) return;
@@ -128,71 +142,117 @@ export default function MiGoleador() {
           </div>
         )}
 
-        {/* Paso 1: Grupo */}
+        {/* Paso 1: Grupo (custom dropdown) */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>1. Selecciona el grupo</label>
-          <select
-            value={selectedGroup}
-            onChange={e => handleGroupChange(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">-- Grupo --</option>
-            {GROUPS.map(g => <option key={g} value={g}>Grupo {g}</option>)}
-          </select>
+          <div ref={groupRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setGroupOpen(!groupOpen)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '0.7rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid var(--glass-border)',
+                background: 'var(--input-bg)',
+                color: selectedGroup ? 'var(--text-main)' : 'var(--text-muted)',
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              {selectedGroup ? (
+                <>
+                  <span style={{
+                    width: '24px', height: '24px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: '1.1rem',
+                    color: 'var(--primary)',
+                  }}>{selectedGroup}</span>
+                  <span>Grupo {selectedGroup}</span>
+                </>
+              ) : (
+                <span>-- Grupo --</span>
+              )}
+              <ChevronDown size={18} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+            </button>
+            {groupOpen && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '10px', marginTop: '4px', maxHeight: '280px', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                {GROUPS.map(g => (
+                  <button key={g} onClick={() => handleGroupSelect(g)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '0.6rem 1rem', border: 'none', borderBottom: '1px solid var(--glass-border)', background: selectedGroup === g ? 'var(--color-warning-bg)' : 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95rem', textAlign: 'left' }}>
+                    <span style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--primary)' }}>{g}</span>
+                    <span>Grupo {g}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Paso 2: Equipo */}
+        {/* Paso 2: Equipo (custom dropdown) */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             2. Selecciona el equipo
-            {loadingTeams && <span style={{ marginLeft: '8px' }}>Cargando...</span>}
+            {loadingTeams && <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando...</span>}
           </label>
-          <select
-            value={selectedTeam?.apiId || ''}
-            onChange={e => {
-              const t = teams.find(t => t.apiId === Number(e.target.value));
-              handleTeamChange(t || null);
-            }}
-            disabled={!selectedGroup || teams.length === 0}
-            style={selectStyle}
-          >
-            <option value="">-- Equipo --</option>
-            {teams.map(t => (
-              <option key={t.apiId} value={t.apiId}>{t.name}</option>
-            ))}
-          </select>
+          <div ref={teamRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => selectedGroup && setTeamOpen(!teamOpen)}
+              disabled={!selectedGroup}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '0.7rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid var(--glass-border)',
+                background: 'var(--input-bg)',
+                color: selectedTeam ? 'var(--text-main)' : 'var(--text-muted)',
+                fontSize: '1rem',
+                fontFamily: 'inherit',
+                cursor: selectedGroup ? 'pointer' : 'not-allowed',
+                opacity: selectedGroup ? 1 : 0.6,
+              }}
+            >
+              {selectedTeam ? (
+                <>
+                  <img src={selectedTeam.logo} alt="" style={{ width: '24px', height: '24px' }} />
+                  <span>{selectedTeam.name}</span>
+                </>
+              ) : (
+                <span>-- Equipo --</span>
+              )}
+              <ChevronDown size={18} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+            </button>
+            {teamOpen && teams.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 40, background: 'var(--bg-card)', border: '1px solid var(--glass-border)', borderRadius: '10px', marginTop: '4px', maxHeight: '200px', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                {teams.map(t => (
+                  <button key={t.apiId} onClick={() => handleTeamSelect(t)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '0.6rem 1rem', border: 'none', borderBottom: '1px solid var(--glass-border)', background: selectedTeam?.apiId === t.apiId ? 'var(--color-warning-bg)' : 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95rem', textAlign: 'left' }}>
+                    <img src={t.logo} alt="" style={{ width: '22px', height: '22px' }} />
+                    <span>{t.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Paso 3: Jugador */}
+        {/* Paso 3: Jugador (lista con fotos) */}
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             3. Selecciona el jugador
-            {loadingPlayers && <span style={{ marginLeft: '8px' }}>Cargando...</span>}
+            {loadingPlayers && <span style={{ marginLeft: '8px', fontSize: '0.8rem' }}>Cargando...</span>}
           </label>
           {players.length > 0 ? (
             <div style={{ maxHeight: '220px', overflowY: 'auto', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
               {players.map(p => {
                 const isSelected = selectedPlayer?.apiId === p.apiId;
                 return (
-                  <button
-                    key={p.apiId}
-                    onClick={() => setSelectedPlayer(p)}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '0.6rem 0.8rem',
-                      border: 'none',
-                      borderBottom: '1px solid var(--glass-border)',
-                      background: isSelected ? 'var(--color-warning-bg)' : 'transparent',
-                      color: 'var(--text-main)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: '0.9rem',
-                      textAlign: 'left',
-                    }}
-                  >
+                  <button key={p.apiId} onClick={() => setSelectedPlayer(p)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '0.6rem 0.8rem', border: 'none', borderBottom: '1px solid var(--glass-border)', background: isSelected ? 'var(--color-warning-bg)' : 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9rem', textAlign: 'left' }}>
                     <img src={p.photo} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                     <span>{p.name}</span>
                     {isSelected && <ChevronDown size={14} style={{ marginLeft: 'auto', color: 'var(--primary)' }} />}
@@ -222,14 +282,3 @@ export default function MiGoleador() {
     </div>
   );
 }
-
-const selectStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '0.7rem 1rem',
-  borderRadius: '10px',
-  border: '1px solid var(--glass-border)',
-  background: 'var(--input-bg)',
-  color: 'var(--text-main)',
-  fontSize: '1rem',
-  fontFamily: 'inherit',
-};
