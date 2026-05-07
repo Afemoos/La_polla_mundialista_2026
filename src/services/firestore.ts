@@ -13,8 +13,6 @@ import {
   writeBatch,
   increment,
   limit,
-  startAt,
-  endAt,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Prediction, RadarMatch, WorldCupTeam, Player, Bracket, FlatPlayer } from '../types/firestore';
@@ -129,11 +127,9 @@ export async function searchPlayers(searchTerm: string, maxResults: number = 20)
   const q = query(
     playersRef,
     orderBy('name'),
-    startAt(term.charAt(0).toUpperCase() + term.slice(1)),
-    endAt(term + '\uf8ff'),
-    limit(maxResults)
+    limit(200)
   );
   const snapshot = await getDocs(q);
-  const results = snapshot.docs.map(d => ({ ...d.data() })) as FlatPlayer[];
-  return results.filter(p => p.name.toLowerCase().includes(term));
+  const all = snapshot.docs.map(d => ({ ...d.data() })) as FlatPlayer[];
+  return all.filter(p => p.name.toLowerCase().includes(term)).slice(0, maxResults);
 }

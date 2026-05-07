@@ -16,9 +16,10 @@ export default function MiCampeon() {
   useEffect(() => {
     if (!currentUser) return;
     Promise.all([
-      getUserBracket(currentUser.uid),
-      Promise.all(['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g)))
+      getUserBracket(currentUser.uid).catch(() => null),
+      Promise.all(['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => getTeamsByGroup(g).catch(() => [])))
         .then(groups => groups.flat().sort((a, b) => a.name.localeCompare(b.name)))
+        .catch(() => [] as WorldCupTeam[])
     ]).then(([b, t]) => {
       setBracket(b);
       setTeams(t);

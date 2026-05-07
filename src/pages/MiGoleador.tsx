@@ -42,8 +42,9 @@ export default function MiGoleador() {
     }
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
-      searchPlayers(searchTerm, 15).then(setResults);
-      setShowResults(true);
+      searchPlayers(searchTerm, 15)
+        .then(r => { setResults(r); setShowResults(true); })
+        .catch(() => { setResults([]); setShowResults(true); });
     }, 250);
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [searchTerm]);
