@@ -686,3 +686,70 @@ tr:hover td {
     margin-top: 4px;
   }
 }
+
+/* ---- Bracket Styles (Mis16) ---- */
+.bracket-container {
+  padding: 1rem;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.bracket-grid {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  min-width: max-content;
+  padding: 0.5rem;
+}
+
+.bracket-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  min-width: 130px;
+  max-width: 150px;
+}
+
+.bracket-round-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bracket-modal {
+  max-width: 420px;
+  width: 90%;
+  padding: 2rem 1.5rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .bracket-grid {
+    justify-content: flex-start;
+    padding: 0.5rem 0;
+  }
+  .bracket-column {
+    min-width: 110px;
+    max-width: 130px;
+  }
+}
