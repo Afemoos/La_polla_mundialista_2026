@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, collection, updateDoc, increment, setDoc } from 'firebase/firestore';
+import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllPredictionsQuery } from '../services/firestore';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 import type { Prediction, AppUser } from '../types/firestore';
 import { Wifi, Coins, Plus, Minus, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet, History } from 'lucide-react';
 
@@ -17,6 +18,10 @@ export default function Admin() {
     const [isTokensOpen, setIsTokensOpen] = useState(true);
     const [isHistorialOpen, setIsHistorialOpen] = useState(false);
     const [excelSyncing, setExcelSyncing] = useState(false);
+    const [isResetOpen, setIsResetOpen] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [resetError, setResetError] = useState('');
+    const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number } | null>(null);
 
     useEffect(() => {
         const q = getAllPredictionsQuery();
@@ -60,6 +65,65 @@ export default function Admin() {
             console.error("Error adding tokens", error);
             alert("❌ Error al agregar tokens.");
         }
+    };
+
+    const handleFactoryReset = async () => {
+        if (!confirm('¿Estás seguro? Esta acción eliminará TODAS las predicciones y brackets. Los equipos, jugadores y configuraciones del sistema no se verán afectados.')) return;
+        if (!confirm('ÚLTIMA CONFIRMACIÓN: ¿Realmente quieres formatear de fábrica?')) return;
+
+        setIsResetting(true);
+        setResetError('');
+        setResetDone(null);
+
+        try {
+            let deletedPredictions = 0;
+            let deletedBrackets = 0;
+
+            // Eliminar predicciones
+            const predictionsSnap = await getDocs(collection(db, 'predictions'));
+            const predictionBatches: Prediction[][] = [];
+            let currentBatch: Prediction[] = [];
+            predictionsSnap.forEach(d => {
+                currentBatch.push({ id: d.id } as Prediction);
+                if (currentBatch.length >= 500) {
+                    predictionBatches.push(currentBatch);
+                    currentBatch = [];
+                }
+            });
+            if (currentBatch.length > 0) predictionBatches.push(currentBatch);
+
+            for (const batch of predictionBatches) {
+                const wb = writeBatch(db);
+                batch.forEach(p => wb.delete(doc(db, 'predictions', p.id)));
+                await wb.commit();
+                deletedPredictions += batch.length;
+            }
+
+            // Eliminar brackets
+            const bracketsSnap = await getDocs(collection(db, 'brackets'));
+            const bracketBatches: string[][] = [];
+            let currentBracketBatch: string[] = [];
+            bracketsSnap.forEach(d => {
+                currentBracketBatch.push(d.id);
+                if (currentBracketBatch.length >= 500) {
+                    bracketBatches.push(currentBracketBatch);
+                    currentBracketBatch = [];
+                }
+            });
+            if (currentBracketBatch.length > 0) bracketBatches.push(currentBracketBatch);
+
+            for (const batch of bracketBatches) {
+                const wb = writeBatch(db);
+                batch.forEach(id => wb.delete(doc(db, 'brackets', id)));
+                await wb.commit();
+                deletedBrackets += batch.length;
+            }
+
+            setResetDone({ predictions: deletedPredictions, brackets: deletedBrackets });
+        } catch (e: any) {
+            setResetError('Error: ' + (e?.message || 'Desconocido'));
+        }
+        setIsResetting(false);
     };
 
     const removeTokens = async (uid: string, amount: number) => {
@@ -348,6 +412,63 @@ export default function Admin() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Formateo de Fábrica */}
+            <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <div
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                    onClick={() => setIsResetOpen(!isResetOpen)}
+                >
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger)' }}>
+                        <AlertTriangle size={20} /> Formateo de Fábrica
+                    </h3>
+                    {isResetOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
+                </div>
+
+                {isResetOpen && (
+                    <div style={{ marginTop: '1rem' }}>
+                        <div style={{ background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
+                            <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '0.5rem' }}>⚠️ Acción irreversible</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                                Esta acción eliminará <strong>todas las predicciones</strong> (colección <code>predictions</code>) y <strong>todos los brackets</strong> (colección <code>brackets</code>).
+                                No se borrarán equipos, jugadores, usuarios ni configuraciones del sistema.
+                            </p>
+                        </div>
+                        {resetError && (
+                            <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', fontSize: '0.9rem' }}>{resetError}</p>
+                        )}
+                        {resetDone !== null && (
+                            <p style={{ color: 'var(--color-success)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                                ✅ Limpieza completada: {resetDone.predictions} predicciones y {resetDone.brackets} brackets eliminados.
+                            </p>
+                        )}
+                        <button
+                            onClick={handleFactoryReset}
+                            disabled={isResetting}
+                            className="glass-btn"
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                background: 'var(--color-danger)',
+                                color: 'white',
+                                border: 'none',
+                                fontWeight: 600,
+                                opacity: isResetting ? 0.6 : 1,
+                            }}
+                        >
+                            {isResetting ? (
+                                <><RefreshCw size={18} style={{ animation: 'spin 1s linear infinite' }} /> Formateando...</>
+                            ) : (
+                                <><Trash2 size={18} /> Formatear de Fábrica</>
+                            )}
+                        </button>
                     </div>
                 )}
             </div>
