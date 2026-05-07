@@ -14,6 +14,7 @@ export default function MiGoleador() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [debugError, setDebugError] = useState('');
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -43,8 +44,8 @@ export default function MiGoleador() {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
       searchPlayers(searchTerm, 15)
-        .then(r => { setResults(r); setShowResults(true); })
-        .catch(() => { setResults([]); setShowResults(true); });
+        .then(r => { setResults(r); setShowResults(true); setDebugError(''); })
+        .catch((e: Error) => { setResults([]); setShowResults(true); setDebugError(e.message); });
     }, 250);
     return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
   }, [searchTerm]);
@@ -220,6 +221,7 @@ export default function MiGoleador() {
         </div>
 
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
+        {debugError && <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>Debug: {debugError}</p>}
 
         <button
           onClick={handleSave}

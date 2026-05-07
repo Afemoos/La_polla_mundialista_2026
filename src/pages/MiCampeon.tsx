@@ -12,6 +12,7 @@ export default function MiCampeon() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [debugError, setDebugError] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -23,10 +24,11 @@ export default function MiCampeon() {
     ]).then(([b, t]) => {
       setBracket(b);
       setTeams(t);
+      setDebugError('');
       if (b?.campeon) {
         setSelectedTeam(t.find(team => team.apiId === b.campeon!.apiId) || null);
       }
-    }).catch(() => setError('Error al cargar datos'))
+    }).catch((e: Error) => { setError('Error al cargar datos'); setDebugError(e.message); })
     .finally(() => setLoading(false));
   }, [currentUser]);
 
@@ -117,6 +119,7 @@ export default function MiCampeon() {
         </div>
 
         {error && <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', textAlign: 'center' }}>{error}</p>}
+        {debugError && <p style={{ color: 'var(--accent-rd)', marginBottom: '1rem', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem', background: 'var(--color-danger-bg)', borderRadius: '8px' }}>{debugError}</p>}
 
         <button
           onClick={handleSave}
