@@ -31,11 +31,6 @@ export function getAllPredictionsQuery() {
   return query(collection(db, 'predictions'), orderBy('timestamp', 'desc'));
 }
 
-export async function togglePredictionStatus(id: string, currentStatus: string) {
-  const newStatus = currentStatus === 'PENDIENTE' ? 'PAGADO' : 'PENDIENTE';
-  await updateDoc(doc(db, 'predictions', id), { status: newStatus });
-}
-
 export async function saveRadarMatch(match: RadarMatch) {
   await setDoc(doc(db, 'system', 'radar_match'), {
     ...match,
@@ -67,13 +62,4 @@ export async function resolveMatchResults(
 
 export async function deleteUserBet(id: string) {
   await deleteDoc(doc(db, 'predictions', id));
-}
-
-export async function requestBetCancellation(id: string) {
-  await updateDoc(doc(db, 'predictions', id), { status: 'CANCELACION_SOLICITADA' });
-}
-
-export async function resolveCancellation(id: string, approved: boolean) {
-  const newStatus = approved ? 'CANCELADA' : 'PAGADO';
-  await updateDoc(doc(db, 'predictions', id), { status: newStatus });
 }

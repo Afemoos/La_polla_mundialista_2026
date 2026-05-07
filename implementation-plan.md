@@ -1,38 +1,50 @@
-# Plan de Implementación: Fase 5 - Resolución de Conflictos Operativos
+# Plan de Implementación: Sistema de Tokens, Eliminación de Estados de Pago y Prevención de Duplicados
 
 ## 1. Contexto y Objetivos
-- **Fallo del Botón de Exportación (Vercel):** El botón manual "Exportar a Excel" está devolviendo un error HTTP. La causa técnica es que Vercel, en su entorno Node.js, no soporta la función `req.json()` de la API Web estándar (solo disponible en Edge).
-- **Aclaración sobre Excel "Duplicados":** Los usuarios reportan que modificar una predicción crea un "nuevo reporte" como si hubieran apostado dos veces. El script oficial `contabilidad.py` **no duplica** los datos, sino que sobreescribe todo desde cero de manera segura. Si hay duplicidad, es muy probable que tengan instalada una extensión externa (ej. "Export to Google Sheets" de Firebase) o Zapier. Necesitamos instruir al administrador vía UI para usar solo la exportación manual y desestimar sistemas de terceros.
-- **Limpieza Estética (Porcentajes):** Se reportó que los porcentajes de probabilidad (Gana, Empate, Pierde) no son útiles y consumen espacio.
-- **Economía de Tokens:** Se solicitó un ajuste económico. Todos los partidos pasarán de costar 1 token a 3 tokens, con excepción de los partidos de la Selección Colombia, que valdrán 5 tokens en fase de grupos.
+- Las predicciones ahora se pagan por adelantado utilizando el saldo de tokens del usuario. Por lo tanto, el concepto de "Estado de Pago" (PENDIENTE, PAGADO, CANCELADA) es obsoleto.
+- Se eliminará toda la lógica visual, de backend y de base de datos relacionada con el `status` de la predicción. Toda apuesta en el sistema se considera oficial y "pagada".
+- **Objetivo adicional:** Solucionar el bug reportado donde un usuario puede generar múltiples predicciones para un mismo partido (duplicados en Google Sheets). Esto se resolverá cambiando la forma en que se guardan los documentos en Firestore.
 
 ## 2. Arquitectura de Base de Datos (Firestore)
-- **Reglas de Seguridad:** *No es necesario modificarlas.* Las reglas actuales permiten que el saldo de `tokens` disminuya (`request.resource.data.tokens <= resource.data.tokens`), sin importar si se restan 1, 3 o 5 tokens. Además, la colección `predictions` no tiene el costo hardcodeado. ¡El sistema es dinámico por diseño!
+- **Colección a modificar:** `predictions`.
+- **Eliminación de campos:** El campo `status` dejará de existir en el esquema y en el tipado (`src/types/firestore.ts`).
+- **Prevención de Duplicados (Nuevo Enfoque):** Actualmente se usa `addDoc` (que genera un ID aleatorio) para guardar una predicción, lo que puede causar duplicados si falla la conexión o el usuario hace clics rápidos. Se migrará a `setDoc(doc(db, 'predictions', \`${currentUser.uid}_${match.id}\`))`. Al usar un **ID predecible**, es matemáticamente imposible que existan dos predicciones del mismo usuario para el mismo partido.
+- **Cambios en `firestore.rules`:** 
+  - Eliminar todas las restricciones que exigen o validan transiciones del campo `status`.
 
-## 3. Backend / APIs
-- **Vercel API:** Se refactorizará `api/trigger-excel-sync.ts` para usar los parámetros clásicos de Node.js (`VercelRequest`, `VercelResponse`).
-- **Python Bot (`fetch_matches.py`):** Modificar la constante `TARGET_MATCHES` para ajustar el precio de cada partido según si juega Colombia o no.
+## 3. Backend / APIs (`legacy_python`)
+- **`contabilidad.py`:**
+  - Ignorar o remover la extracción del `estado`.
+  - En la pestaña de **Resumen Financiero**, eliminar las métricas de "Dinero Faltante" y los cálculos basados en apuestas "PENDIENTES". Todo en la base de datos se asume pagado.
+  - La condición de ganancia pasa de `if bet["resultado"] == "GANADOR" and bet["estado"] == "PAGADO":` a `if bet["resultado"] == "GANADOR":`.
+- **Limpieza de Datos (Script Único):** Se creará y ejecutará un pequeño script temporal (ej. `limpieza.py`) que buscará todas las predicciones antiguas en Firestore con `status == 'CANCELADA'` o `status == 'PENDIENTE'` y las borrará para dejar la base de datos limpia.
 
 ## 4. Frontend: Interfaces y Componentes (UI/UX)
-- `Home.tsx`: Eliminación completa de la sección de probabilidades (`<div className="radar-prob">`).
-- `Admin.tsx`: Mensaje aclaratorio de uso para prevenir confusión con duplicados en Excel generados por integraciones de terceros.
+- **`src/pages/PollaMundialista.tsx`:**
+  - Cambiar la lógica de creación de `addDoc(...)` a `setDoc(...)` usando el ID compuesto `uid_matchId`.
+- **`src/pages/MisApuestas.tsx`:** 
+  - Eliminar las columnas y etiquetas visuales (badges) relacionadas con "PENDIENTE" y "PAGADO".
+  - Las apuestas son definitivas al crearse, pero pueden modificarse dentro del plazo de 48 horas. No hay botón de "Solicitar Cancelación".
+- **`src/pages/Admin.tsx`:**
+  - Eliminar por completo el acordeón/sección de "Aprobación de Pagos y Cancelaciones".
+  - **NUEVO:** Añadir una tabla colapsable llamada "Historial de Recargas de Tokens" que permita al administrador revisar cuándo y a quién se le asignaron o descontaron tokens (si existe registro de esto en Firebase, de lo contrario, sentar las bases en la UI).
 
-## 5. Lógica de Reglas de Negocio
-- Costo Base: 3 tokens.
-- Costo Premium (Colombia): 5 tokens.
-
-## 6. To-Do List (Checklist de Progreso)
+## 5. To-Do List (Checklist de Progreso)
 *Agente: Marca con una `[x]` las tareas a medida que las vayas completando.*
 
-### [Categoría 1: Resolución del Endpoint Vercel]
-- [x] 1. En `api/trigger-excel-sync.ts`, importar `VercelRequest` y `VercelResponse` desde `@vercel/node`. Cambiar la declaración de la función a `export default async function handler(req: VercelRequest, res: VercelResponse)`. Reemplazar `const body = (await req.json()) as { email?: string }` por `const body = req.body`. Y cambiar todos los retornos `return new Response(...)` por `return res.status(...).json(...)`. Eliminar el `/// <reference types="node" />` si se usa la importación de Vercel. 
+### Fase 1: Limpieza de Base de Datos y Tipos
+- [x] 1. Crear y ejecutar un script de Python que borre todos los documentos en `predictions` cuyo `status` sea 'CANCELADA' o 'PENDIENTE'.
+- [x] 2. Modificar `firestore.rules` eliminando las restricciones relacionadas con `status`.
+- [x] 3. Actualizar `src/types/firestore.ts` eliminando el atributo `status` de la interfaz `Prediction`.
+- [x] 4. Limpiar `src/services/firestore.ts` eliminando funciones huérfanas de estado de pago (`togglePaymentStatus`, etc.).
 
-### [Categoría 2: Limpieza de UI (`Home.tsx`)]
-- [x] 2. Abrir `src/pages/Home.tsx` y localizar el componente funcional `MatchRadar`. Borrar todo el bloque `<div className="radar-prob">...</div>` y sus 3 divs hijos para desaparecer permanentemente los porcentajes de victoria de la UI.
+### Fase 2: Corrección Arquitectónica (Duplicados)
+- [x] 5. En `PollaMundialista.tsx` (o donde se creen apuestas): Cambiar `addDoc(collection...)` por `setDoc(doc(db, 'predictions', \`${currentUser.uid}_${match.id}\`))`. Ajustar la lógica de comprobación de existencia `hasPrediction` para que encaje con este nuevo formato de ID.
 
-### [Categoría 3: Economía y Python Bot (`fetch_matches.py` y `contabilidad.py`)]
-- [x] 3. En `legacy_python/fetch_matches.py`, actualizar la lista `TARGET_MATCHES`. Identificar los 3 partidos donde el local o visitante sea "Colombia" y cambiar el 5º elemento de la tupla (costo en tokens) de `1` a `5`. Para los otros 10 partidos, cambiarlo a `3`.
-- [x] 4. En `legacy_python/contabilidad.py`, al actualizar la pestaña 'Resumen Financiero' (alrededor de la línea 103), añadir una nueva fila al arreglo `resumen_data` que muestre: `["Última Sincronización", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Hora del servidor"]`. (Asegurarse de importar `datetime`).
+### Fase 3: Refactorización de la UI (Frontend)
+- [x] 6. En `MisApuestas.tsx`: Remover la columna "Pago", sus indicadores, y los botones de solicitar cancelación.
+- [x] 7. En `Admin.tsx`: Eliminar el panel de control de cobros.
+- [x] 8. En `Admin.tsx`: Crear la nueva sección colapsable "Historial de Recargas" (asegurarse de que inicie cerrada).
 
-### [Categoría 4: Aclaraciones de Interfaz (`Admin.tsx`)]
-- [x] 5. En `src/pages/Admin.tsx`, añadir un pequeño texto informativo `<p>` con estilo `color: var(--text-muted), fontSize: 0.8rem` inmediatamente debajo del botón de *Sincronizar a Excel*, que diga: *"Nota: El botón reemplaza la hoja completa de Auditoría evitando duplicados. Extensiones de terceros sí pueden causar duplicados."*
+### Fase 4: Ajustes en Backend (Bots)
+- [x] 9. Actualizar `legacy_python/contabilidad.py` para ignorar el `status`, simplificando la evaluación de resultados y eliminando "Dinero Faltante" del resumen de Google Sheets.

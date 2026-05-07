@@ -7,6 +7,17 @@ from firebase_admin import firestore
 import gspread
 from google.oauth2.service_account import Credentials
 
+def formatear_fecha(ts):
+    """Convierte un Timestamp de Firestore a string ISO legible.
+    Retorna 'N/A' si el valor es None o no se puede formatear."""
+    if ts is None:
+        return "N/A"
+    try:
+        # Firestore timestamps heredan de datetime y tienen strftime
+        return ts.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(ts)
+
 # --- CONFIGURACION ---
 SHEET_ID = "1F6cHIW0gCb3G0vFFhnQkTLwrRtrdnBJXIOsCgkKOCb4"
 CREDENTIALS_FILE = "credenciales_gcp.json"
@@ -58,9 +69,7 @@ def main():
         docs = predictions_ref.stream()
         
         all_bets = []
-        total_pagado = 0
-        total_pendiente = 0
-        bolsa_ganadores = 0
+        total_valor = 0
         
         # Precio por apuesta (asumimos 5000 COP, ajusta si es necesario)
         VALOR_APUESTA = 5000
@@ -73,28 +82,21 @@ def main():
                 "email": data.get("email", "Desconocido"),
                 "partido": data.get("matchDetails", "Desconocido"),
                 "prediccion": data.get("prediction", ""),
-                "estado": data.get("status", "PENDIENTE"),
-                "resultado": data.get("result", "En Juego")
+                "resultado": data.get("result", "En Juego"),
+                "timestamp": formatear_fecha(data.get("timestamp")),
+                "lockedAt": formatear_fecha(data.get("lockedAt")),
             }
             all_bets.append(bet)
-            
-            if bet["estado"] == "PAGADO":
-                total_pagado += VALOR_APUESTA
-            else:
-                total_pendiente += VALOR_APUESTA
-                
-            if bet["resultado"] == "GANADOR" and bet["estado"] == "PAGADO":
-                # Si ganó y pagó, tiene derecho a parte de la bolsa (se calculará globalmente luego)
-                pass
+            total_valor += VALOR_APUESTA
 
-        bolsa_repartir = total_pagado * (1 - COMISION_CASA)
-        ganancia_casa = total_pagado * COMISION_CASA
+        bolsa_repartir = total_valor * (1 - COMISION_CASA)
+        ganancia_casa = total_valor * COMISION_CASA
 
         # 5. Escribir Auditoria
         print("Actualizando pestaña 'Auditoria'...")
-        auditoria_data = [["ID Ticket", "Email", "Partido", "Predicción", "Estado de Pago", "Resultado"]]
+        auditoria_data = [["ID Ticket", "Email", "Partido", "Predicción", "Resultado", "Fecha Creación", "Fecha Bloqueo"]]
         for b in all_bets:
-            auditoria_data.append([b["id"], b["email"], b["partido"], b["prediccion"], b["estado"], b["resultado"]])
+            auditoria_data.append([b["id"], b["email"], b["partido"], b["prediccion"], b["resultado"], b["timestamp"], b["lockedAt"]])
         
         ws_auditoria.clear()
         ws_auditoria.update(values=auditoria_data, range_name="A1")
@@ -103,8 +105,7 @@ def main():
         print("Actualizando pestaña 'Resumen Financiero'...")
         resumen_data = [
             ["Métrica", "Valor (COP)", "Notas"],
-            ["Total Dinero en Caja (Pagado)", total_pagado, "Dinero real recolectado"],
-            ["Dinero Faltante (Pendiente)", total_pendiente, "Deudas de usuarios"],
+            ["Total Valor Apuestas", total_valor, "Todas las apuestas son prepagadas con tokens"],
             ["Bolsa a Repartir", bolsa_repartir, f"Restando {COMISION_CASA*100}% de comisión"],
             ["Ganancia Administrador", ganancia_casa, "Para la casa"],
             ["Total Tickets Auditados", len(all_bets), ""],

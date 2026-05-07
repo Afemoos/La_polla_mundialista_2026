@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, setDoc, updateDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Prediction } from '../types/firestore';
 import { Calendar, MapPin, Lock, Edit3, Save, AlertTriangle, Coins } from 'lucide-react';
@@ -93,8 +93,9 @@ function MatchCard({
 
     setSaving(true);
     try {
-      // Crear predicción y descontar tokens
-      await addDoc(collection(db, 'predictions'), {
+      // AI-NOTE: ID compuesto uid_matchId previene duplicados
+      const predictionDocRef = doc(db, 'predictions', `${currentUser!.uid}_${match.id}`);
+      await setDoc(predictionDocRef, {
         email: currentUser?.email,
         type: 'POLla_MUNDIALISTA',
         fixtureId: match.id,
@@ -102,7 +103,6 @@ function MatchCard({
         prediction: predictionStr,
         homeLogo: match.homeFlag || '',
         awayLogo: match.awayFlag || '',
-        status: 'PENDIENTE',
         tokenCost: match.tokenCost,
         lockedAt: serverTimestamp(),
         timestamp: serverTimestamp()

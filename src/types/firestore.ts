@@ -5,7 +5,6 @@ export interface Prediction {
   fixtureId?: string;
   matchDetails?: string;
   prediction?: string;
-  status: 'PENDIENTE' | 'PAGADO' | 'CANCELACION_SOLICITADA' | 'CANCELADA';
   timestamp?: any;
   result?: 'GANADA' | 'PERDIDA' | string | null;
   finalScore?: string;

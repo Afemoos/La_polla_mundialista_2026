@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { onSnapshot, doc, collection, updateDoc, increment, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllPredictionsQuery, togglePredictionStatus, resolveCancellation } from '../services/firestore';
+import { getAllPredictionsQuery } from '../services/firestore';
 import type { Prediction, AppUser } from '../types/firestore';
-import { CheckCircle, XCircle, Wifi, Coins, Plus, Minus, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet } from 'lucide-react';
+import { Wifi, Coins, Plus, Minus, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet, History } from 'lucide-react';
 
 export default function Admin() {
     const { currentUser } = useAuth() || {};
@@ -15,14 +15,11 @@ export default function Admin() {
     const [syncing, setSyncing] = useState(false);
     const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null);
     const [isTokensOpen, setIsTokensOpen] = useState(true);
-    const [isBetsOpen, setIsBetsOpen] = useState(false);
+    const [isHistorialOpen, setIsHistorialOpen] = useState(false);
     const [excelSyncing, setExcelSyncing] = useState(false);
-
-    // Solo retenemos los estados y lógica de control de ingresos
 
     useEffect(() => {
         const q = getAllPredictionsQuery();
-        // Escucha centralizada de todas las apuestas sin filtro
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const betsArray: Prediction[] = [];
             querySnapshot.forEach((d) => {
@@ -33,7 +30,6 @@ export default function Admin() {
         return () => unsubscribe();
     }, []);
 
-    // Escuchar el estado de la API en tiempo real
     useEffect(() => {
         const unsubApi = onSnapshot(doc(db, 'system', 'api_status'), (snap) => {
             if (snap.exists()) {
@@ -53,24 +49,6 @@ export default function Admin() {
         });
         return () => unsubUsers();
     }, []);
-
-    const toggleStatus = async (id: string, currentStatus: string) => {
-        try {
-            await togglePredictionStatus(id, currentStatus);
-        } catch (error) {
-            console.error("Error updating status", error);
-        }
-    };
-
-    const handleResolveCancel = async (id: string, approved: boolean) => {
-        try {
-            await resolveCancellation(id, approved);
-        } catch (error) {
-            console.error("Error resolving cancellation", error);
-        }
-    };
-
-    const cancellationRequests = allBets.filter(b => b.status === 'CANCELACION_SOLICITADA');
 
     const addTokens = async (uid: string, amount: number) => {
         const finalAmount = amount || 1;
@@ -96,7 +74,6 @@ export default function Admin() {
         }
     };
 
-    // AI-NOTE: Sincroniza usuarios históricos desde allBets a la colección users
     const syncMissingUsers = async () => {
         setSyncing(true);
         try {
@@ -155,7 +132,7 @@ export default function Admin() {
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
                 <p style={{ color: 'var(--text-muted)', margin: 0 }}>
-                    Vista protegida. Gestiona pagos, tokens y cancelaciones.
+                    Vista protegida. Gestiona tokens y auditoría de apuestas.
                 </p>
                 <button
                     className="btn-primary"
@@ -194,42 +171,6 @@ export default function Admin() {
                             🕐 {new Date(apiStatus.last_updated.toDate()).toLocaleTimeString('es-CO')}
                         </span>
                     )}
-                </div>
-            )}
-
-            {/* SOLICITUDES DE CANCELACIÓN (siempre visible si hay) */}
-            {cancellationRequests.length > 0 && (
-                <div className="glass-card" style={{ borderColor: 'var(--color-danger)', marginBottom: '1.5rem' }}>
-                    <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger)' }}>
-                        <XCircle size={20} /> Solicitudes de Cancelación Pendientes
-                    </h3>
-                    <div className="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Usuario</th>
-                                    <th>Evento</th>
-                                    <th>Marcador</th>
-                                    <th>Acción Requerida</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {cancellationRequests.map((bet) => (
-                                    <tr key={bet.id}>
-                                        <td style={{ fontWeight: 600 }}>{bet.email}</td>
-                                        <td>{bet.matchDetails || bet.type}</td>
-                                        <td>{bet.prediction}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button onClick={() => handleResolveCancel(bet.id!, true)} className="btn-danger-small">Aprobar Cancelación</button>
-                                                <button onClick={() => handleResolveCancel(bet.id!, false)} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto' }}>Denegar</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             )}
 
@@ -359,56 +300,52 @@ export default function Admin() {
                 </div>
             )}
 
-            {/* 2. PANEL DE CONTROL DE INGRESOS (colapsado por defecto) */}
+            {/* 2. HISTORIAL DE RECARGAS (colapsado por defecto) */}
             <div className="glass-card">
                 <div
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isBetsOpen ? '1.5rem' : '0', cursor: 'pointer' }}
-                    onClick={() => setIsBetsOpen(!isBetsOpen)}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isHistorialOpen ? '1.5rem' : '0', cursor: 'pointer' }}
+                    onClick={() => setIsHistorialOpen(!isHistorialOpen)}
                 >
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <CheckCircle size={20} color="var(--color-success)" /> Panel de Control de Ingresos
+                        <History size={20} color="var(--primary)" /> Historial de Recargas de Tokens
                     </h3>
-                    {isBetsOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
+                    {isHistorialOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
                 </div>
 
-                {isBetsOpen && (
+                {isHistorialOpen && (
                     <div className="table-container">
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                            Saldo actual de tokens por usuario. Las recargas y descuentos se realizan desde la sección de Gestión de Tokens.
+                        </p>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Ticket ID</th>
                                     <th>Usuario</th>
-                                    <th>Evento</th>
-                                    <th>Marcador</th>
-                                    <th>Fecha (DD/MM)</th>
-                                    <th>Acción Inmediata</th>
+                                    <th>Email</th>
+                                    <th>Balance de Tokens</th>
+                                    <th>Predicciones Activas</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {allBets.length === 0 ? (
-                                    <tr><td colSpan={5} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay apuestas registradas</td></tr>
-                                ) : allBets.map((bet) => (
-                                    <tr key={bet.id}>
-                                        <td>
-                                            <span style={{ background: 'var(--glass-bg)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                                                {bet.id.slice(0, 8)}...
-                                            </span>
-                                        </td>
-                                        <td style={{ fontWeight: 600 }}>{bet.email}</td>
-                                        <td>{bet.matchDetails || bet.type}</td>
-                                        <td>{bet.prediction}</td>
-                                        <td>{bet.timestamp ? new Date(bet.timestamp.toDate()).toLocaleDateString() : 'N/A'}</td>
-                                        <td>
-                                            <button onClick={() => toggleStatus(bet.id, bet.status)}
-                                                style={{ background: bet.status === 'PAGADO' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
-                                                    border: `1px solid ${bet.status === 'PAGADO' ? 'var(--color-success)' : 'var(--primary)'}`,
-                                                    color: bet.status === 'PAGADO' ? 'var(--color-success)' : 'var(--primary)',
-                                                    padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 800, minWidth: '110px' }}>
-                                                {bet.status}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {users.length === 0 ? (
+                                    <tr><td colSpan={4} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td></tr>
+                                ) : users.map((user) => {
+                                    const userPredictionCount = allBets.filter(b => b.email === user.email).length;
+                                    return (
+                                        <tr key={user.uid}>
+                                            <td style={{ fontWeight: 600 }}>👤 Usuario</td>
+                                            <td style={{ color: 'var(--text-muted)' }}>{user.email}</td>
+                                            <td>
+                                                <span style={{ background: 'var(--color-success-bg)', padding: '6px 14px', borderRadius: '20px', fontWeight: 800, color: 'var(--color-success)', fontSize: '1rem' }}>
+                                                    🪙 {user.tokens}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span style={{ color: 'var(--text-muted)' }}>{userPredictionCount} predicción(es)</span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
