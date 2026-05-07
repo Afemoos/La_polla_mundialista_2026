@@ -123,13 +123,13 @@ export async function searchPlayers(searchTerm: string, maxResults: number = 20)
   const term = searchTerm.trim().toLowerCase();
   if (term.length === 0) return [];
 
-  const playersRef = collection(db, 'flat_players');
-  const q = query(
-    playersRef,
-    orderBy('name'),
-    limit(200)
-  );
-  const snapshot = await getDocs(q);
-  const all = snapshot.docs.map(d => ({ ...d.data() })) as FlatPlayer[];
-  return all.filter(p => p.name.toLowerCase().includes(term)).slice(0, maxResults);
+  try {
+    const playersRef = collection(db, 'flat_players');
+    const snapshot = await getDocs(query(playersRef, limit(300)));
+    const all = snapshot.docs.map(d => ({ ...d.data() })) as FlatPlayer[];
+    return all.filter(p => p.name.toLowerCase().includes(term)).slice(0, maxResults);
+  } catch (e) {
+    console.error('searchPlayers error:', e);
+    return [];
+  }
 }
