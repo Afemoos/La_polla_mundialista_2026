@@ -124,3 +124,54 @@ export interface FlatPlayer {
   teamCode: string;
   teamLogo: string;
 }
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  tokens: number;
+  paidFeatures: string[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  deletedAt: Timestamp | null;
+}
+
+export interface PredictionV2 {
+  matchId: string;
+  matchDetails: string;
+  homeScore: number;
+  awayScore: number;
+  tokenCost: number;
+  lockedAt: Timestamp;
+  result: 'GANADA' | 'PERDIDA' | null;
+  finalScore: string | null;
+  createdAt: Timestamp;
+  deletedAt: Timestamp | null;
+}
+
+export interface BracketV2 {
+  matches: BracketMatch[];
+  score: number | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  deletedAt: Timestamp | null;
+}
+
+export interface CampeonPick {
+  teamApiId: number;
+  teamName: string;
+  teamCode: string;
+  teamLogo: string;
+  result: 'GANADA' | 'PERDIDA' | null;
+  createdAt: Timestamp;
+  deletedAt: Timestamp | null;
+}
+
+export interface GoleadorPick {
+  playerApiId: number;
+  playerName: string;
+  playerPhoto: string;
+  teamName: string;
+  result: 'GANADA' | 'PERDIDA' | null;
+  createdAt: Timestamp;
+  deletedAt: Timestamp | null;
+}

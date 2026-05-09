@@ -15,7 +15,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { Prediction, RadarMatch, WorldCupTeam, Player, Bracket, FlatPlayer } from '../types/firestore';
+import type { Prediction, RadarMatch, WorldCupTeam, Player, Bracket, FlatPlayer, UserProfile, PredictionV2, BracketV2, CampeonPick, GoleadorPick } from '../types/firestore';
 
 export function getUserBetsQuery(email: string) {
   return query(
@@ -143,5 +143,62 @@ export async function searchPlayers(searchTerm: string, maxResults: number = 20)
   } catch (e) {
     console.error('searchPlayers error:', e);
     return [];
+  }
+}
+
+export async function getTournamentTeams(tournamentId: string): Promise<WorldCupTeam[]> {
+  const ref = collection(db, `tournaments/${tournamentId}/teams`);
+  const snap = await getDocs(ref);
+  return snap.docs.map(d => ({ ...d.data() })) as WorldCupTeam[];
+}
+
+export async function getTournamentPlayers(tournamentId: string, teamApiId: number): Promise<Player[]> {
+  const ref = collection(db, `tournaments/${tournamentId}/players`);
+  const q = query(ref, where('teamApiId', '==', teamApiId), limit(60));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ ...d.data() })) as unknown as Player[];
+}
+
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, 'users', uid, 'profile'));
+  return snap.exists() ? (snap.data() as UserProfile) : null;
+}
+
+export async function getUserPredictions(uid: string, tournamentId: string): Promise<PredictionV2[]> {
+  const ref = collection(db, `users/${uid}/tournaments/${tournamentId}/predictions`);
+  const snap = await getDocs(ref);
+  return snap.docs.map(d => ({ ...d.data() })) as PredictionV2[];
+}
+
+export async function getUserBracketV2(uid: string, tournamentId: string): Promise<BracketV2 | null> {
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/bracket`));
+  return snap.exists() ? (snap.data() as BracketV2) : null;
+}
+
+export async function getCampeonPick(uid: string, tournamentId: string): Promise<CampeonPick | null> {
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/campeon`));
+  return snap.exists() ? (snap.data() as CampeonPick) : null;
+}
+
+export async function getGoleadorPick(uid: string, tournamentId: string): Promise<GoleadorPick | null> {
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/goleador`));
+  return snap.exists() ? (snap.data() as GoleadorPick) : null;
+}
+
+export async function saveUserPick(
+  uid: string,
+  tournamentId: string,
+  type: 'bracket' | 'campeon' | 'goleador',
+  data: Record<string, unknown>,
+  tokenDeduction?: { amount: number }
+): Promise<void> {
+  const ref = doc(db, `users/${uid}/tournaments/${tournamentId}/${type}`);
+  if (tokenDeduction) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'users', uid, 'profile'), { tokens: increment(-tokenDeduction.amount) });
+    batch.set(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
+    await batch.commit();
+  } else {
+    await setDoc(ref, { ...data, updatedAt: serverTimestamp() }, { merge: true });
   }
 }

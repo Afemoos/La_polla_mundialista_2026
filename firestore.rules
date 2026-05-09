@@ -126,5 +126,59 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+
+    match /system/round_of_32_matches {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ======= NUEVAS REGLAS (Data-base migration) =======
+    match /tournaments/{tournamentId} {
+      allow read: if isAuthenticated();
+      match /teams/{teamCode} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+      match /players/{playerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+      match /system/{doc} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+    match /users/{innerUid} {
+      match /profile {
+        allow read, update: if isAuthenticated() && (request.auth.uid == innerUid || isAdmin());
+        allow create: if request.auth.uid == innerUid;
+        allow delete: if isAdmin();
+      }
+      match /tournaments/{t} {
+        match /predictions/{matchId} {
+          allow read: if request.auth.uid == innerUid || isAdmin();
+          allow create, update: if request.auth.uid == innerUid;
+          allow delete: if isAdmin();
+        }
+        match /bracket {
+          allow read: if request.auth.uid == innerUid || isAdmin();
+          allow create, update: if request.auth.uid == innerUid;
+          allow delete: if isAdmin();
+        }
+        match /campeon {
+          allow read: if request.auth.uid == innerUid || isAdmin();
+          allow create, update: if request.auth.uid == innerUid;
+          allow delete: if isAdmin();
+        }
+        match /goleador {
+          allow read: if request.auth.uid == innerUid || isAdmin();
+          allow create, update: if request.auth.uid == innerUid;
+          allow delete: if isAdmin();
+        }
+      }
+      match /deleted/{docId} {
+        allow read, write: if isAdmin();
+      }
+    }
   }
 }

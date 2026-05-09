@@ -193,7 +193,7 @@ def find_team_in_dict(group_name, team_dict):
     return None
 
 
-def save_team_to_firestore(db, group, position, doc_id, team_entry, is_host):
+def save_team_to_firestore(db, group, position, doc_id, team_entry, is_host, fifa_code):
     """Guarda un equipo en Firestore usando setDoc (idempotente)."""
     team_data = team_entry["team"]
     venue_data = team_entry["venue"]
@@ -223,6 +223,10 @@ def save_team_to_firestore(db, group, position, doc_id, team_entry, is_host):
 
     path = f"Teams/world_cup_2026/Group_{group}/{doc_id}"
     db.document(path).set(doc_data)
+    # AI-NOTE: Guardar tambien en la nueva ruta plana (por codigo FIFA corregido)
+    team_code = fifa_code
+    new_path = f"tournaments/world_cup_2026/teams/{team_code}"
+    db.document(new_path).set(doc_data)
     print(f"  \u2705 Guardado: {path}")
 
 
@@ -266,6 +270,20 @@ def fetch_and_save_squad(db, team_api_id, group, doc_id, team_entry):
             # AI-NOTE: Guardar tambien en coleccion plana para busqueda rapida (MiGoleador)
             flat_path = f"flat_players/{player_id}"
             db.document(flat_path).set({
+                "apiId": player.get("id"),
+                "name": player.get("name"),
+                "age": player.get("age"),
+                "number": player.get("number"),
+                "position": player.get("position"),
+                "photo": player.get("photo"),
+                "teamApiId": team_api_id,
+                "teamName": team_data.get("name"),
+                "teamCode": team_data.get("code"),
+                "teamLogo": team_data.get("logo"),
+            })
+            # AI-NOTE: Guardar tambien en la nueva ruta de torneo (plana)
+            tournament_path = f"tournaments/world_cup_2026/players/{player_id}"
+            db.document(tournament_path).set({
                 "apiId": player.get("id"),
                 "name": player.get("name"),
                 "age": player.get("age"),
@@ -330,7 +348,7 @@ def main():
 
         try:
             # Guardar equipo
-            save_team_to_firestore(db, group, position, doc_id, team_entry, is_host)
+            save_team_to_firestore(db, group, position, doc_id, team_entry, is_host, code)
             teams_saved += 1
 
             # Obtener y guardar squad
