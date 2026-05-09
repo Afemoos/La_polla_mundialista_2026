@@ -1,6 +1,6 @@
 # Data-base — Fase 3 (Parte 2): Componentes de Predicción
 
-**Depende de:** `Data-base_F3-Auth.md` completado.  
+**Depende de:** `02-authcontext.md` completado.  
 **Objetivo:** Migrar los 5 componentes de predicción a las nuevas rutas de Firestore. Cada componente se actualiza de forma independiente.
 
 ---

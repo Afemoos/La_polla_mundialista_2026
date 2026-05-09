@@ -1,6 +1,6 @@
 # Data-base — Fase 3 (Parte 3): Admin + Fases 4 y 5
 
-**Depende de:** `Data-base_F3-Auth.md` y `Data-base_F3-Pages.md` completados.  
+**Depende de:** `02-authcontext.md` y `03-paginas.md` completados.  
 **Objetivo:** Migrar Admin.tsx, limpiar colecciones antiguas y actualizar los bots de Python.
 
 ---

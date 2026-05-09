@@ -1,6 +1,6 @@
 # Data-base — Fase 3 (Parte 1): AuthContext
 
-**Depende de:** `Data-base_F1-F2.md` completado.  
+**Depende de:** `01-nuevas-colecciones.md` completado.  
 **Objetivo:** Migrar `AuthContext.tsx` para crear `users/{uid}/profile` al hacer login. El Sidebar y los componentes de predicción se actualizan en documentos posteriores para mantener consistencia de tokens.
 
 ---
