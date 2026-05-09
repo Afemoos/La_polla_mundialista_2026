@@ -95,6 +95,19 @@ Documentos con estructura (`src/types/firestore.ts`):
 3. **Pre-Commit Check:** Es **OBLIGATORIO** ejecutar `npm run build` antes de cualquier commit. Si TypeScript falla, el despliegue automático en Vercel se romperá. Corrige el tipado (ej. quitando `any` o importando tipos) y reintenta el build.
 4. **Manejo de Habilidades (Autoskills):** Si se añaden/modifican *skills* en `.agents/skills/`, ejecutar `npx autoskills` y asegurarse de subir el `skills-lock.json` en el commit.
 
+## Firestore — Reglas de Migración de Datos
+
+**⚠️ NUNCA borres una colección para re-poblarla desde cero si solo necesitas corregir unos pocos documentos.** 
+Firestore tiene un límite de 20,000 escrituras/día en el plan gratuito. Borrar y re-crear una colección de 1616 documentos consume ~3,200 operaciones que podrían haberse resuelto con ~10 escrituras correctivas.
+
+**Reglas:**
+1. **Antes de migrar:** Auditar qué documentos faltan o son incorrectos. Solo escribir los que necesitan cambio.
+2. **Correcciones puntuales:** Usar `setDoc()` para sobreescribir documentos individuales, no re-ejecutar el script completo.
+3. **Idempotencia:** Todos los scripts de poblado deben usar `setDoc()` (no `addDoc()`) y aceptar re-ejecución sin crear duplicados.
+4. **Rate limiting:** Si el script escribe más de 100 documentos, agregar `time.sleep(0.5)` entre lotes para no agotar el quota.
+5. **Respaldo:** Las colecciones antiguas no se eliminan hasta que las nuevas estén verificadas y funcionando en producción.
+6. **Quota:** Si aparece `429 Quota exceeded`, detener todas las escrituras. Esperar al reset diario. No reintentar en bucle.
+
 ## Manejo de Errores y Estabilidad
 
 - **Cero pantallas en blanco:** Toda operación asíncrona (Firestore o API externa) debe tener un estado de `loading` (UI visual) y bloques `try/catch` rigurosos. Si algo falla, notificar al usuario (no ocultar el error).
