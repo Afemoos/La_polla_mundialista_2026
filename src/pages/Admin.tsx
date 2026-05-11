@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, updateDoc, increment, setDoc, getDocs, getDoc, writeBatch, collectionGroup, query } from 'firebase/firestore';
+import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, Trash2 } from 'lucide-react';
@@ -118,7 +118,7 @@ export default function Admin() {
     };
 
     const handleFactoryReset = async () => {
-        if (!confirm('¿Estás seguro? Esta acción eliminará TODAS las predicciones y brackets. Los equipos, jugadores y configuraciones del sistema no se verán afectados.')) return;
+        if (!confirm('¿Estás seguro? Esta acción eliminará TODAS las predicciones y brackets.')) return;
         if (!confirm('ÚLTIMA CONFIRMACIÓN: ¿Realmente quieres formatear de fábrica?')) return;
 
         setIsResetting(true);
@@ -128,101 +128,55 @@ export default function Admin() {
         try {
             let deletedPredictions = 0;
             let deletedBrackets = 0;
-
-            // Eliminar predicciones (collectionGroup)
-            const predictionsSnap = await getDocs(query(collectionGroup(db, 'predictions')));
-            const predictionDocs: { path: string }[] = [];
-            predictionsSnap.forEach(d => predictionDocs.push({ path: d.ref.path }));
-            
-            const predBatches: { path: string }[][] = [];
-            let currentPredBatch: { path: string }[] = [];
-            predictionDocs.forEach(p => {
-                currentPredBatch.push(p);
-                if (currentPredBatch.length >= 500) { predBatches.push(currentPredBatch); currentPredBatch = []; }
-            });
-            if (currentPredBatch.length > 0) predBatches.push(currentPredBatch);
-
-            for (const batch of predBatches) {
-                const wb = writeBatch(db);
-                batch.forEach(p => wb.delete(doc(db, p.path)));
-                await wb.commit();
-                deletedPredictions += batch.length;
-            }
-
-            // Eliminar brackets/campeon/goleador (recorrer usuarios)
-            const usersSnap = await getDocs(query(collectionGroup(db, 'profile')));
-            const bracketDocs: string[] = [];
-            for (const u of usersSnap.docs) {
-                const uid = u.data().uid;
-                for (const type of ['bracket', 'campeon', 'goleador']) {
-                    const ref = doc(db, `users/${uid}/tournaments/world_cup_2026/${type}`, 'data');
-                    const snap = await getDoc(ref);
-                    if (snap.exists()) bracketDocs.push(ref.path);
-                }
-            }
-            const bracketBatches: string[][] = [];
-            let currentBracketBatch: string[] = [];
-            bracketDocs.forEach(p => {
-                currentBracketBatch.push(p);
-                if (currentBracketBatch.length >= 500) { bracketBatches.push(currentBracketBatch); currentBracketBatch = []; }
-            });
-            if (currentBracketBatch.length > 0) bracketBatches.push(currentBracketBatch);
-
-            for (const batch of bracketBatches) {
-                const wb = writeBatch(db);
-                batch.forEach(p => wb.delete(doc(db, p)));
-                await wb.commit();
-                deletedBrackets += batch.length;
-            }
-
-            // Resetear tokens de todos los usuarios a 0
             let tokensReset = 0;
-            const profileSnap = await getDocs(query(collectionGroup(db, 'profile')));
-            const profileBatches: string[][] = [];
-            let currentProfileBatch: string[] = [];
-            profileSnap.forEach(d => {
-                currentProfileBatch.push(d.ref.path);
-                if (currentProfileBatch.length >= 500) { profileBatches.push(currentProfileBatch); currentProfileBatch = []; }
-            });
-            if (currentProfileBatch.length > 0) profileBatches.push(currentProfileBatch);
-
-            for (const batch of profileBatches) {
-                const wb = writeBatch(db);
-                batch.forEach(p => wb.update(doc(db, p), { tokens: 0 }));
-                await wb.commit();
-                tokensReset += batch.length;
-            }
-
-            // Eliminar usuarios duplicados (mismo email, diferentes UID)
             let duplicatesRemoved = 0;
-            const dedupSnap = await getDocs(query(collectionGroup(db, 'profile')));
-            const byEmail: Record<string, { uid: string; tokens: number; path: string }[]> = {};
-            dedupSnap.forEach(d => {
-                const data = d.data();
-                const email = data.email || '';
-                if (!byEmail[email]) byEmail[email] = [];
-                byEmail[email].push({ uid: data.uid, tokens: data.tokens || 0, path: d.ref.path });
-            });
-            const toDelete: string[] = [];
-            for (const [_email, entries] of Object.entries(byEmail)) {
-                if (entries.length <= 1) continue;
-                entries.sort((a, b) => b.tokens - a.tokens);
-                const [, ...remove] = entries;
-                remove.forEach(r => toDelete.push(r.path));
-            }
-            if (toDelete.length > 0) {
-                const dedupBatches: string[][] = [];
-                let currentDedupBatch: string[] = [];
-                toDelete.forEach(p => {
-                    currentDedupBatch.push(p);
-                    if (currentDedupBatch.length >= 500) { dedupBatches.push(currentDedupBatch); currentDedupBatch = []; }
+
+            // Usar la lista de usuarios ya cargada en estado (users[])
+            for (const user of users) {
+                // Eliminar predicciones del usuario
+                const predSnap = await getDocs(collection(db, `users/${user.uid}/tournaments/world_cup_2026/predictions`));
+                const predBatches: string[][] = [];
+                let currentPredBatch: string[] = [];
+                predSnap.forEach(d => {
+                    currentPredBatch.push(d.ref.path);
+                    if (currentPredBatch.length >= 500) { predBatches.push(currentPredBatch); currentPredBatch = []; }
                 });
-                if (currentDedupBatch.length > 0) dedupBatches.push(currentDedupBatch);
-                for (const batch of dedupBatches) {
+                if (currentPredBatch.length > 0) predBatches.push(currentPredBatch);
+                for (const batch of predBatches) {
                     const wb = writeBatch(db);
                     batch.forEach(p => wb.delete(doc(db, p)));
                     await wb.commit();
-                    duplicatesRemoved += batch.length;
+                    deletedPredictions += batch.length;
+                }
+
+                // Eliminar bracket/campeon/goleador
+                for (const type of ['bracket', 'campeon', 'goleador']) {
+                    const ref = doc(db, `users/${user.uid}/tournaments/world_cup_2026/${type}`, 'data');
+                    const snap = await getDoc(ref);
+                    if (snap.exists()) {
+                        await deleteDoc(ref);
+                        deletedBrackets++;
+                    }
+                }
+
+                // Resetear tokens
+                await updateDoc(doc(db, 'users', user.uid, 'profile', 'data'), { tokens: 0 });
+                tokensReset++;
+            }
+
+            // Eliminar duplicados
+            const byEmail: Record<string, { uid: string; tokens: number }[]> = {};
+            for (const user of users) {
+                const email = user.email || '';
+                if (!byEmail[email]) byEmail[email] = [];
+                byEmail[email].push({ uid: user.uid, tokens: user.tokens });
+            }
+            for (const entries of Object.values(byEmail)) {
+                if (entries.length <= 1) continue;
+                entries.sort((a, b) => b.tokens - a.tokens);
+                for (const entry of entries.slice(1)) {
+                    await deleteDoc(doc(db, 'users', entry.uid, 'profile', 'data'));
+                    duplicatesRemoved++;
                 }
             }
 
