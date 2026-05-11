@@ -87,6 +87,12 @@ export default function MiGoleador() {
 
   const handleSave = async () => {
     if (!currentUser || !selectedPlayer || !selectedTeam) return;
+    if (pick) {
+      const confirmed = window.confirm(
+        'Ya tienes una predicción guardada. Puedes modificarla sin costo adicional hasta el inicio de los dieciseisavos (al finalizar la fase de grupos).\n\n¿Deseas cambiar tu predicción?'
+      );
+      if (!confirmed) return;
+    }
     setSaving(true);
     setError('');
     const alreadyPaid = profile?.paidFeatures?.includes('goleador');
