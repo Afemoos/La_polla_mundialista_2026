@@ -21,6 +21,7 @@ export default function Admin() {
     const [isResetting, setIsResetting] = useState(false);
     const [resetError, setResetError] = useState('');
     const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number; duplicatesRemoved: number } | null>(null);
+    const [picks, setPicks] = useState<Record<string, { campeon?: string; goleador?: string }>>({});
 
     useEffect(() => {
         const q = query(collectionGroup(db, 'predictions'));
@@ -72,6 +73,36 @@ export default function Admin() {
             setUsers(usersList);
         });
         return () => unsubUsers();
+    }, []);
+
+    useEffect(() => {
+        const unsubCampeon = onSnapshot(query(collectionGroup(db, 'campeon')), (snap) => {
+            setPicks(prev => {
+                const updated = { ...prev };
+                snap.forEach(d => {
+                    const pathParts = d.ref.path.split('/');
+                    const uid = pathParts[1] || '';
+                    const data = d.data();
+                    if (!updated[uid]) updated[uid] = {};
+                    updated[uid].campeon = data.teamName || 'Seleccionado';
+                });
+                return updated;
+            });
+        });
+        const unsubGoleador = onSnapshot(query(collectionGroup(db, 'goleador')), (snap) => {
+            setPicks(prev => {
+                const updated = { ...prev };
+                snap.forEach(d => {
+                    const pathParts = d.ref.path.split('/');
+                    const uid = pathParts[1] || '';
+                    const data = d.data();
+                    if (!updated[uid]) updated[uid] = {};
+                    updated[uid].goleador = data.playerName || 'Seleccionado';
+                });
+                return updated;
+            });
+        });
+        return () => { unsubCampeon(); unsubGoleador(); };
     }, []);
 
     const addTokens = async (uid: string, amount: number) => {
@@ -463,14 +494,17 @@ export default function Admin() {
                                     <th>Usuario</th>
                                     <th>Email</th>
                                     <th>Balance de Tokens</th>
-                                    <th>Predicciones Activas</th>
+                                    <th>Pred.</th>
+                                    <th>Campeón</th>
+                                    <th>Goleador</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {users.length === 0 ? (
-                                    <tr><td colSpan={4} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td></tr>
+                                    <tr><td colSpan={6} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td></tr>
                                 ) : users.map((user) => {
                                     const userPredictionCount = allBets.filter((b: any) => b._uid === user.uid).length;
+                                    const userPicks = picks[user.uid] || {};
                                     return (
                                         <tr key={user.uid}>
                                             <td style={{ fontWeight: 600 }}>👤 Usuario</td>
@@ -481,7 +515,17 @@ export default function Admin() {
                                                 </span>
                                             </td>
                                             <td>
-                                                <span style={{ color: 'var(--text-muted)' }}>{userPredictionCount} predicción(es)</span>
+                                                <span style={{ color: 'var(--text-muted)' }}>{userPredictionCount}</span>
+                                            </td>
+                                            <td>
+                                                <span style={{ color: userPicks.campeon ? 'var(--color-success)' : 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                    {userPicks.campeon || '—'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span style={{ color: userPicks.goleador ? 'var(--color-success)' : 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                                    {userPicks.goleador || '—'}
+                                                </span>
                                             </td>
                                         </tr>
                                     );
