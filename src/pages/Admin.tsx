@@ -28,12 +28,17 @@ export default function Admin() {
             const betsArray: Prediction[] = [];
             querySnapshot.forEach((d) => {
                 const data = d.data();
+                // AI-NOTE: Extraer UID del path: users/{uid}/tournaments/.../predictions/{matchId}
+                const pathParts = d.ref.path.split('/');
+                const uidFromPath = pathParts[1] || ''; // {uid} está en posición 1
+                const userEmail = users.find(u => u.uid === uidFromPath)?.email || uidFromPath;
                 betsArray.push({
                     id: d.id,
-                    email: data.email || '',
+                    email: userEmail,
+                    _uid: uidFromPath,
                     type: 'POLla_MUNDIALISTA',
                     matchDetails: data.matchDetails || '',
-                    prediction: data.homeScore + ' - ' + (data.awayScore || ''),
+                    prediction: (data.homeScore ?? '') + ' - ' + (data.awayScore ?? ''),
                     result: data.result,
                     finalScore: data.finalScore,
                     timestamp: data.createdAt,
@@ -465,7 +470,7 @@ export default function Admin() {
                                 {users.length === 0 ? (
                                     <tr><td colSpan={4} style={{textAlign: 'center', color: 'var(--text-muted)'}}>No hay usuarios registrados</td></tr>
                                 ) : users.map((user) => {
-                                    const userPredictionCount = allBets.filter(b => b.email === user.email).length;
+                                    const userPredictionCount = allBets.filter((b: any) => b._uid === user.uid).length;
                                     return (
                                         <tr key={user.uid}>
                                             <td style={{ fontWeight: 600 }}>👤 Usuario</td>
