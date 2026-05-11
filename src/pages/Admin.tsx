@@ -12,7 +12,6 @@ export default function Admin() {
     const [apiStatus, setApiStatus] = useState<{ requests_current: number; requests_limit: number; last_updated: any } | null>(null);
     const [users, setUsers] = useState<AppUser[]>([]);
     const [tokenAmounts, setTokenAmounts] = useState<Record<string, number>>({});
-    const [syncing, setSyncing] = useState(false);
     const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null);
     const [isTokensOpen, setIsTokensOpen] = useState(true);
     const [isHistorialOpen, setIsHistorialOpen] = useState(false);
@@ -199,37 +198,6 @@ export default function Admin() {
         }
     };
 
-    const syncMissingUsers = async () => {
-        setSyncing(true);
-        try {
-            const existingEmails = new Set(users.map(u => u.email));
-            const uniqueEmails = [...new Set(allBets.map(b => b.email).filter(Boolean))] as string[];
-            let created = 0;
-
-            for (const email of uniqueEmails) {
-                if (!existingEmails.has(email)) {
-                    const docId = email.replace(/[.#$/\[\]]/g, '_');
-                    await setDoc(doc(db, 'users', docId, 'profile', 'data'), {
-                        uid: docId,
-                        email: email,
-                        tokens: 0
-                    });
-                    created++;
-                }
-            }
-
-            if (created > 0) {
-                alert(`✅ Se sincronizaron ${created} usuario(s) histórico(s). Aparecerán en la tabla en breve.`);
-            } else {
-                alert('Todos los usuarios históricos ya están registrados.');
-            }
-        } catch (error) {
-            console.error("Error syncing users:", error);
-            alert("❌ Error al sincronizar usuarios.");
-        }
-        setSyncing(false);
-    };
-
     const handleSyncExcel = async () => {
         setExcelSyncing(true);
         try {
@@ -308,16 +276,7 @@ export default function Admin() {
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', margin: 0 }}>
                         <Coins size={20} /> Gestión de Tokens
                     </h3>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button
-                            className="btn-primary"
-                            style={{ padding: '8px 16px', fontSize: '0.85rem', width: 'auto' }}
-                            onClick={(e) => { e.stopPropagation(); syncMissingUsers(); }}
-                            disabled={syncing}
-                        >
-                            <RefreshCw size={16} style={{ marginRight: '6px' }} />
-                            {syncing ? 'Sincronizando...' : 'Sincronizar Usuarios Antiguos'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {isTokensOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
                     </div>
                 </div>
