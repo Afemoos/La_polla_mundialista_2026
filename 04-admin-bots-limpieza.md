@@ -34,18 +34,22 @@ const unsubUsers = onSnapshot(
 **2. Agregar/Quitar tokens:**
 
 Cambiar `updateDoc(doc(db, 'users', uid), { tokens: increment(amount) })`  
-por `updateDoc(doc(db, 'users', uid, 'profile'), { tokens: increment(amount) })`.
+por `updateDoc(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(amount) })`.
 
 **3. Vista de predicciones (auditoría):**
 
 Actualmente filtra `allBets` por email y muestra predicciones del usuario en una tabla.
 
-Cambiar a leer directamente de la subcolección del usuario (sin necesidad de `_userId` ni `collectionGroup`):
+Cambiar a leer directamente de la subcolección del usuario. El Admin tiene `selectedUserEmail` (email) pero necesita el `selectedUserId` (UID) para la nueva ruta. Buscar el UID en la lista de usuarios:
+
 ```typescript
-// En lugar de filtrar allBets por email, leer de la ruta del usuario:
+// En lugar de filtrar allBets por email
+const selectedUser = users.find(u => u.email === selectedUserEmail);
+if (!selectedUser) return;
+const selectedUserId = selectedUser.uid;
 const q = collection(db, `users/${selectedUserId}/tournaments/world_cup_2026/predictions`);
 const snap = await getDocs(q);
-// Mapear los documentos al formato que espera la tabla existente
+// Mapear los documentos al formato que espera la tabla existente (Prediction[])
 ```
 
 **4. Formateo de fábrica:**
@@ -63,7 +67,7 @@ import { collectionGroup } from 'firebase/firestore';
 
 ---
 
-## Parte B: Fase 4 — Limpieza de colecciones antiguas
+## Parte C: Fase 4 — Limpieza de colecciones antiguas (ejecutar DESPUÉS de los bots)
 
 ### Paso 1: Verificar en preview
 
@@ -97,7 +101,7 @@ def delete_collection(coll_ref, batch_size=500):
 
 ### Paso 4: Simplificar firestore.rules
 
-Eliminar las reglas antiguas del archivo `firestore.rules`. Solo deben quedar las reglas nuevas de `tournaments/` y `users/{uid}/profile/data`. Desplegar:
+Eliminar las reglas antiguas del archivo `firestore.rules`. Solo deben quedar las reglas nuevas de `tournaments/`, `users/{uid}/profile/{profileDoc}`, y `users/{uid}/tournaments/`. Desplegar:
 
 ```bash
 npx firebase deploy --only firestore:rules
@@ -105,7 +109,9 @@ npx firebase deploy --only firestore:rules
 
 ---
 
-## Parte C: Fase 5 — Bots
+## Parte B: Fase 5 — Bots (ejecutar ANTES de la limpieza)
+
+Los bots deben migrarse primero para que sigan escribiendo en las rutas que el frontend ya lee. Si se limpian las colecciones viejas antes de migrar los bots, los radares y resultados desaparecerán.
 
 ### fetch_matches.py
 
@@ -162,20 +168,20 @@ docs = db.collection_group("predictions").stream()
 ## To-Do List
 
 ### Admin
-- [ ] 1. Migrar lectura de usuarios a `collectionGroup('profile')`
-- [ ] 2. Migrar add/remove tokens a `users/{uid}/profile/data`
-- [ ] 3. Migrar vista de predicciones (leer de `users/{selectedUserId}/tournaments/.../predictions/`)
-- [ ] 4. Actualizar formateo de fábrica para nuevas rutas
-- [ ] 5. `npm run build`
+- [x] 1. Migrar lectura de usuarios a `collectionGroup('profile')`
+- [x] 2. Migrar add/remove tokens a `users/{uid}/profile/data`
+- [x] 3. Migrar vista de predicciones (leer de `users/{selectedUserId}/tournaments/.../predictions/`)
+- [x] 4. Actualizar formateo de fábrica para nuevas rutas
+- [x] 5. `npm run build`
 
-### Limpieza
-- [ ] 6. Verificar todo en preview
-- [ ] 7. Ejecutar formateo de fábrica
-- [ ] 8. Eliminar colecciones antiguas + docs sueltos de system/
-- [ ] 9. Simplificar `firestore.rules` (solo reglas nuevas) y desplegar
+### Bots (ejecutar ANTES de limpieza)
+- [x] 6. Actualizar `fetch_matches.py`
+- [x] 7. Actualizar `auditor.py` con `collection_group`
+- [x] 8. Actualizar `fetch_results.py`
+- [x] 9. Actualizar `contabilidad.py` con `collection_group`
 
-### Bots
-- [ ] 10. Actualizar `fetch_matches.py`
-- [ ] 11. Actualizar `auditor.py` con `collection_group`
-- [ ] 12. Actualizar `fetch_results.py`
-- [ ] 13. Actualizar `contabilidad.py` con `collection_group`
+### Limpieza (ejecutar DESPUÉS de bots)
+- [ ] 10. Verificar todo en preview
+- [ ] 11. Ejecutar formateo de fábrica
+- [ ] 12. Eliminar colecciones antiguas + docs sueltos de system/
+- [ ] 13. Simplificar `firestore.rules` (solo reglas nuevas) y desplegar

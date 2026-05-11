@@ -89,10 +89,7 @@ def main():
         db = firestore.client()
 
         # 1. Obtener predicciones que no tienen resultado y que tienen fixtureId
-        preds_ref = db.collection("predictions")
-        
-        # Filtramos por las que NO tienen result (result is null, pero Firestore no permite hacer '==' null en algunas consultas simples, así que traemos todas y filtramos localmente para evitar crear índices complejos).
-        docs = preds_ref.get()
+        docs = db.collection_group("predictions").stream()
         
         pending_audits = {} # Dict para agrupar apuestas por fixtureId
         
@@ -105,7 +102,7 @@ def main():
             f_id = data["fixtureId"]
             if f_id not in pending_audits:
                 pending_audits[f_id] = []
-            pending_audits[f_id].append({"id": doc.id, "prediction": data.get("prediction")})
+            pending_audits[f_id].append({"ref": doc.reference, "prediction": data.get("prediction")})
             
         if not pending_audits:
             print("No hay apuestas pendientes con fixtureId por auditar.")
@@ -126,11 +123,10 @@ def main():
                 batch = db.batch()
                 winners = 0
                 for bet in bets:
-                    bet_ref = db.collection("predictions").document(bet["id"])
                     is_winner = "GANADA" if bet["prediction"] == final_score else "PERDIDA"
                     if is_winner == "GANADA":
                         winners += 1
-                    batch.update(bet_ref, {"result": is_winner, "finalScore": final_score})
+                    batch.update(bet["ref"], {"result": is_winner, "finalScore": final_score})
                 
                 batch.commit()
                 print(f"  ✅ Partidas auditadas. {winners} ganadores.")

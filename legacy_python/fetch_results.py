@@ -29,7 +29,7 @@ def update_api_status(db, response_headers):
         current_req = response_headers['x-ratelimit-requests-current']
         limit_req = response_headers.get('x-ratelimit-requests-limit', '7500')
         try:
-            db.collection("system").document("api_status").set({
+            db.collection("tournaments/world_cup_2026/system").document("api_status").set({
                 "requests_current": int(current_req),
                 "requests_limit": int(limit_req),
                 "last_updated": firestore.SERVER_TIMESTAMP
@@ -104,7 +104,7 @@ def main():
         worldcup_results = get_recent_matches(WORLD_CUP_ID, is_team=False)
 
         # Guardar en Firestore
-        db.collection("system").document("recent_results").set({
+        db.collection("tournaments/world_cup_2026/system").document("recent_results").set({
             "colombia": colombia_results,
             "champions": champions_results,
             "worldcup": worldcup_results,

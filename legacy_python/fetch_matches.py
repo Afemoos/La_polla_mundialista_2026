@@ -28,7 +28,7 @@ def update_api_status(db, response_headers):
         current_req = response_headers['x-ratelimit-requests-current']
         limit_req = response_headers.get('x-ratelimit-requests-limit', '7500')
         try:
-            db.collection("system").document("api_status").set({
+            db.collection("tournaments/world_cup_2026/system").document("api_status").set({
                 "requests_current": int(current_req),
                 "requests_limit": int(limit_req),
                 "last_updated": firestore.SERVER_TIMESTAMP
@@ -262,7 +262,7 @@ def fetch_worldcup_path(db):
         matches.append(match_obj)
 
     try:
-        db.collection("system").document("worldcup_path").set({
+        db.collection("tournaments/world_cup_2026/system").document("worldcup_path").set({
             "matches": matches,
             "updatedAt": firestore.SERVER_TIMESTAMP
         })
@@ -353,12 +353,12 @@ def main():
         if radar_match_global:
             print("Actualizando el documento system/radar_match...")
             radar_match_global["updatedAt"] = firestore.SERVER_TIMESTAMP
-            db.collection("system").document("radar_match").set(radar_match_global)
+            db.collection("tournaments/world_cup_2026/system").document("radar_match").set(radar_match_global)
 
         if radar_match_colombia:
             print("Actualizando el documento system/colombia_match...")
             radar_match_colombia["updatedAt"] = firestore.SERVER_TIMESTAMP
-            db.collection("system").document("colombia_match").set(radar_match_colombia)
+            db.collection("tournaments/world_cup_2026/system").document("colombia_match").set(radar_match_colombia)
         
         # AI-NOTE: Actualizar ruta mundialista (system/worldcup_path)
         fetch_worldcup_path(db)

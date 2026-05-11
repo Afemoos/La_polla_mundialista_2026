@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { onSnapshot, doc, updateDoc, increment, setDoc, getDocs, getDoc, writeBatch, collectionGroup, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllPredictionsQuery } from '../services/firestore';
@@ -45,10 +45,13 @@ export default function Admin() {
     }, []);
 
     useEffect(() => {
-        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+        const unsubUsers = onSnapshot(
+          query(collectionGroup(db, 'profile')),
+          (snap) => {
             const usersList: AppUser[] = [];
             snap.forEach((d) => {
-                usersList.push({ uid: d.id, ...d.data() } as AppUser);
+                const data = d.data();
+                usersList.push({ uid: data.uid, email: data.email, tokens: data.tokens } as AppUser);
             });
             setUsers(usersList);
         });
@@ -58,7 +61,7 @@ export default function Admin() {
     const addTokens = async (uid: string, amount: number) => {
         const finalAmount = amount || 1;
         try {
-            await updateDoc(doc(db, 'users', uid), { tokens: increment(finalAmount) });
+            await updateDoc(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(finalAmount) });
             setTokenAmounts(prev => ({ ...prev, [uid]: 0 }));
             alert(`✅ Se agregaron ${finalAmount} token(s) exitosamente.`);
         } catch (error) {
@@ -79,100 +82,98 @@ export default function Admin() {
             let deletedPredictions = 0;
             let deletedBrackets = 0;
 
-            // Eliminar predicciones
-            const predictionsSnap = await getDocs(collection(db, 'predictions'));
-            const predictionBatches: Prediction[][] = [];
-            let currentBatch: Prediction[] = [];
-            predictionsSnap.forEach(d => {
-                currentBatch.push({ id: d.id } as Prediction);
-                if (currentBatch.length >= 500) {
-                    predictionBatches.push(currentBatch);
-                    currentBatch = [];
-                }
+            // Eliminar predicciones (collectionGroup)
+            const predictionsSnap = await getDocs(query(collectionGroup(db, 'predictions')));
+            const predictionDocs: { path: string }[] = [];
+            predictionsSnap.forEach(d => predictionDocs.push({ path: d.ref.path }));
+            
+            const predBatches: { path: string }[][] = [];
+            let currentPredBatch: { path: string }[] = [];
+            predictionDocs.forEach(p => {
+                currentPredBatch.push(p);
+                if (currentPredBatch.length >= 500) { predBatches.push(currentPredBatch); currentPredBatch = []; }
             });
-            if (currentBatch.length > 0) predictionBatches.push(currentBatch);
+            if (currentPredBatch.length > 0) predBatches.push(currentPredBatch);
 
-            for (const batch of predictionBatches) {
+            for (const batch of predBatches) {
                 const wb = writeBatch(db);
-                batch.forEach(p => wb.delete(doc(db, 'predictions', p.id)));
+                batch.forEach(p => wb.delete(doc(db, p.path)));
                 await wb.commit();
                 deletedPredictions += batch.length;
             }
 
-            // Eliminar brackets
-            const bracketsSnap = await getDocs(collection(db, 'brackets'));
+            // Eliminar brackets/campeon/goleador (recorrer usuarios)
+            const usersSnap = await getDocs(query(collectionGroup(db, 'profile')));
+            const bracketDocs: string[] = [];
+            for (const u of usersSnap.docs) {
+                const uid = u.data().uid;
+                for (const type of ['bracket', 'campeon', 'goleador']) {
+                    const ref = doc(db, `users/${uid}/tournaments/world_cup_2026/${type}`);
+                    const snap = await getDoc(ref);
+                    if (snap.exists()) bracketDocs.push(ref.path);
+                }
+            }
             const bracketBatches: string[][] = [];
             let currentBracketBatch: string[] = [];
-            bracketsSnap.forEach(d => {
-                currentBracketBatch.push(d.id);
-                if (currentBracketBatch.length >= 500) {
-                    bracketBatches.push(currentBracketBatch);
-                    currentBracketBatch = [];
-                }
+            bracketDocs.forEach(p => {
+                currentBracketBatch.push(p);
+                if (currentBracketBatch.length >= 500) { bracketBatches.push(currentBracketBatch); currentBracketBatch = []; }
             });
             if (currentBracketBatch.length > 0) bracketBatches.push(currentBracketBatch);
 
             for (const batch of bracketBatches) {
                 const wb = writeBatch(db);
-                batch.forEach(id => wb.delete(doc(db, 'brackets', id)));
+                batch.forEach(p => wb.delete(doc(db, p)));
                 await wb.commit();
                 deletedBrackets += batch.length;
             }
 
             // Resetear tokens de todos los usuarios a 0
             let tokensReset = 0;
-            const usersSnap = await getDocs(collection(db, 'users'));
-            const userBatches: string[][] = [];
-            let currentUserBatch: string[] = [];
-            usersSnap.forEach(d => {
-                currentUserBatch.push(d.id);
-                if (currentUserBatch.length >= 500) {
-                    userBatches.push(currentUserBatch);
-                    currentUserBatch = [];
-                }
+            const profileSnap = await getDocs(query(collectionGroup(db, 'profile')));
+            const profileBatches: string[][] = [];
+            let currentProfileBatch: string[] = [];
+            profileSnap.forEach(d => {
+                currentProfileBatch.push(d.ref.path);
+                if (currentProfileBatch.length >= 500) { profileBatches.push(currentProfileBatch); currentProfileBatch = []; }
             });
-            if (currentUserBatch.length > 0) userBatches.push(currentUserBatch);
+            if (currentProfileBatch.length > 0) profileBatches.push(currentProfileBatch);
 
-            for (const batch of userBatches) {
+            for (const batch of profileBatches) {
                 const wb = writeBatch(db);
-                batch.forEach(id => wb.update(doc(db, 'users', id), { tokens: 0 }));
+                batch.forEach(p => wb.update(doc(db, p), { tokens: 0 }));
                 await wb.commit();
                 tokensReset += batch.length;
             }
 
             // Eliminar usuarios duplicados (mismo email, diferentes UID)
-            // AI-NOTE: Ocurre cuando un usuario elimina y re-crea su cuenta de Google
             let duplicatesRemoved = 0;
-            const usersForDedup = await getDocs(collection(db, 'users'));
-            const byEmail: Record<string, { uid: string; tokens: number }[]> = {};
-            usersForDedup.forEach(d => {
+            const dedupSnap = await getDocs(query(collectionGroup(db, 'profile')));
+            const byEmail: Record<string, { uid: string; tokens: number; path: string }[]> = {};
+            dedupSnap.forEach(d => {
                 const data = d.data();
                 const email = data.email || '';
                 if (!byEmail[email]) byEmail[email] = [];
-                byEmail[email].push({ uid: d.id, tokens: data.tokens || 0 });
+                byEmail[email].push({ uid: data.uid, tokens: data.tokens || 0, path: d.ref.path });
             });
             const toDelete: string[] = [];
             for (const [_email, entries] of Object.entries(byEmail)) {
                 if (entries.length <= 1) continue;
-                // Conservar el que tenga más tokens; si hay empate, el primero
                 entries.sort((a, b) => b.tokens - a.tokens);
                 const [, ...remove] = entries;
-                remove.forEach(r => toDelete.push(r.uid));
+                remove.forEach(r => toDelete.push(r.path));
             }
             if (toDelete.length > 0) {
                 const dedupBatches: string[][] = [];
                 let currentDedupBatch: string[] = [];
-                toDelete.forEach(id => {
-                    currentDedupBatch.push(id);
-                    if (currentDedupBatch.length >= 500) {
-                        dedupBatches.push(currentDedupBatch);
-                        currentDedupBatch = [];
-                    }
+                toDelete.forEach(p => {
+                    currentDedupBatch.push(p);
+                    if (currentDedupBatch.length >= 500) { dedupBatches.push(currentDedupBatch); currentDedupBatch = []; }
                 });
                 if (currentDedupBatch.length > 0) dedupBatches.push(currentDedupBatch);
                 for (const batch of dedupBatches) {
                     const wb = writeBatch(db);
-                    batch.forEach(id => wb.delete(doc(db, 'users', id)));
+                    batch.forEach(p => wb.delete(doc(db, p)));
                     await wb.commit();
                     duplicatesRemoved += batch.length;
                 }
@@ -188,7 +189,7 @@ export default function Admin() {
     const removeTokens = async (uid: string, amount: number) => {
         const finalAmount = amount || 1;
         try {
-            await updateDoc(doc(db, 'users', uid), { tokens: increment(-finalAmount) });
+            await updateDoc(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(-finalAmount) });
             setTokenAmounts(prev => ({ ...prev, [uid]: 0 }));
             alert(`✅ Se restaron ${finalAmount} token(s) exitosamente.`);
         } catch (error) {
@@ -207,7 +208,7 @@ export default function Admin() {
             for (const email of uniqueEmails) {
                 if (!existingEmails.has(email)) {
                     const docId = email.replace(/[.#$/\[\]]/g, '_');
-                    await setDoc(doc(db, 'users', docId), {
+                    await setDoc(doc(db, 'users', docId, 'profile', 'data'), {
                         uid: docId,
                         email: email,
                         tokens: 0

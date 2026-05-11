@@ -65,7 +65,7 @@ def main():
 
         # 4. Descargar apuestas de Firestore
         print("Descargando datos de Firestore...")
-        predictions_ref = db.collection("predictions")
+        predictions_ref = db.collection_group("predictions")
         docs = predictions_ref.stream()
         
         all_bets = []
