@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserBracket, saveUserBracket, getAllTeams } from '../services/firestore';
-import type { Bracket, WorldCupTeam } from '../types/firestore';
+import { getCampeonPick, saveUserPick, getTournamentTeams, getUserProfile } from '../services/firestore';
+import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import type { CampeonPick, WorldCupTeam, UserProfile } from '../types/firestore';
 import { Crown, Save, ChevronDown } from 'lucide-react';
 
 export default function MiCampeon() {
   const { currentUser } = useAuth() || {};
-  const [bracket, setBracket] = useState<Bracket | null>(null);
+  const [pick, setPick] = useState<CampeonPick | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [teams, setTeams] = useState<WorldCupTeam[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<WorldCupTeam | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -20,20 +23,21 @@ export default function MiCampeon() {
     setLoading(true);
     loadData();
     async function loadData() {
-      let bracketData: Bracket | null = null;
       try {
-        bracketData = await getUserBracket(currentUser!.uid);
-        setBracket(bracketData);
-      } catch { /* bracket might not exist yet, OK */ }
-      try {
-        const t = await getAllTeams();
-        setTeams(t);
-        if (bracketData?.campeon && t.length > 0) {
-          const found = t.find(team => team.apiId === bracketData.campeon!.apiId);
+        const [p, pr, t] = await Promise.all([
+          getCampeonPick(currentUser!.uid, 'world_cup_2026'),
+          getUserProfile(currentUser!.uid),
+          getTournamentTeams('world_cup_2026'),
+        ]);
+        setPick(p);
+        setProfile(pr);
+        setTeams(t.sort((a, b) => a.name.localeCompare(b.name)));
+        if (p?.teamApiId && t.length > 0) {
+          const found = t.find(team => team.apiId === p.teamApiId);
           if (found) setSelectedTeam(found);
         }
       } catch (e: any) {
-        setError('Error al cargar equipos: ' + (e?.message || ''));
+        setError('Error al cargar: ' + (e?.message || ''));
       }
       setLoading(false);
     }
@@ -53,31 +57,27 @@ export default function MiCampeon() {
     if (!currentUser || !selectedTeam) return;
     setSaving(true);
     setError('');
-    const alreadyPaid = bracket?.tokensSpent?.campeon && bracket.tokensSpent.campeon > 0;
+    const alreadyPaid = profile?.paidFeatures?.includes('campeon');
     try {
-      await saveUserBracket(
-        currentUser.uid,
-        {
-          email: currentUser.email || '',
-          campeon: { apiId: selectedTeam.apiId, name: selectedTeam.name, code: selectedTeam.code, logo: selectedTeam.logo },
-        },
-        alreadyPaid ? undefined : { field: 'campeon', amount: 10 }
-      );
-      setBracket(prev => {
-        const updated: Bracket = {
-          ...(prev || {} as Bracket),
-          campeon: { apiId: selectedTeam.apiId, name: selectedTeam.name, code: selectedTeam.code, logo: selectedTeam.logo },
-          userId: currentUser.uid,
-          email: currentUser.email || '',
-          matches: prev?.matches || [],
-          tokensSpent: { bracket: prev?.tokensSpent?.bracket || 0, campeon: alreadyPaid ? (prev?.tokensSpent?.campeon || 10) : 10, goleador: prev?.tokensSpent?.goleador || 0 },
-          score: prev?.score ?? null,
-          campeonResult: prev?.campeonResult ?? null,
-          goleadorResult: prev?.goleadorResult ?? null,
-          createdAt: (prev?.createdAt || null) as any,
-          updatedAt: null as any,
-        };
-        return updated;
+      await saveUserPick(currentUser.uid, 'world_cup_2026', 'campeon', {
+        teamApiId: selectedTeam.apiId,
+        teamName: selectedTeam.name,
+        teamCode: selectedTeam.code,
+        teamLogo: selectedTeam.logo,
+      }, alreadyPaid ? undefined : { amount: 10 });
+      if (!alreadyPaid) {
+        await updateDoc(doc(db, 'users', currentUser.uid, 'profile', 'data'), {
+          paidFeatures: arrayUnion('campeon')
+        });
+      }
+      setPick({
+        teamApiId: selectedTeam.apiId,
+        teamName: selectedTeam.name,
+        teamCode: selectedTeam.code,
+        teamLogo: selectedTeam.logo,
+        result: null,
+        createdAt: null as any,
+        deletedAt: null,
       });
     } catch {
       setError('Error al guardar');
@@ -99,12 +99,12 @@ export default function MiCampeon() {
           10 tokens — selecciona el equipo que crees que ganará el Mundial 2026
         </p>
 
-        {bracket?.campeon && (
+        {pick && (
           <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-success-bg)', borderRadius: '12px', border: '1px solid var(--color-success)' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Tu predicción actual</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-              <img src={bracket.campeon.logo} alt="" style={{ width: '36px', height: '36px' }} />
-              <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{bracket.campeon.name}</span>
+              <img src={pick.teamLogo} alt="" style={{ width: '36px', height: '36px' }} />
+              <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{pick.teamName}</span>
             </div>
           </div>
         )}
@@ -193,7 +193,7 @@ export default function MiCampeon() {
           </div>
         </div>
 
-        {selectedTeam && !bracket?.campeon && (
+        {selectedTeam && !pick && (
           <div style={{ marginBottom: '1.5rem', padding: '1.2rem', background: 'var(--color-warning-bg)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
               <img src={selectedTeam.logo} alt="" style={{ width: '48px', height: '48px' }} />
@@ -222,7 +222,7 @@ export default function MiCampeon() {
           style={{ width: '100%', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Save size={18} />
-          {bracket?.tokensSpent?.campeon ? 'Actualizar' : 'Guardar (10 tokens)'}
+          {profile?.paidFeatures?.includes('campeon') ? 'Actualizar' : 'Guardar (10 tokens)'}
         </button>
       </div>
     </div>

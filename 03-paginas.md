@@ -273,12 +273,12 @@ Probar en `npm run dev`:
 
 ## To-Do List
 
-- [ ] 1. Actualizar `PollaMundialista.tsx` (5 cambios: lectura, guardado, descuento, modificación, sistema)
-- [ ] 2. Actualizar `MisApuestas.tsx` (lectura de predicciones desde nueva ruta)
-- [ ] 3. Actualizar `MiCampeon.tsx` (lectura, equipos, guardado con paidFeatures)
-- [ ] 4. Actualizar `MiGoleador.tsx` (lectura, equipos planos, jugadores planos, guardado)
-- [ ] 5. Actualizar `Mis16.tsx` (solo cambiar path de sistema)
-- [ ] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile/data`
-- [ ] 7. Actualizar `Home.tsx` — cambiar paths de `system/radar_match` y `system/colombia_match`
-- [ ] 8. `npm run build` — sin errores
+- [x] 1. Actualizar `PollaMundialista.tsx` (5 cambios: lectura, guardado, descuento, modificación, sistema)
+- [x] 2. Actualizar `MisApuestas.tsx` (lectura de predicciones desde nueva ruta)
+- [x] 3. Actualizar `MiCampeon.tsx` (lectura, equipos, guardado con paidFeatures)
+- [x] 4. Actualizar `MiGoleador.tsx` (lectura, equipos planos, jugadores planos, guardado)
+- [x] 5. Actualizar `Mis16.tsx` (solo cambiar path de sistema)
+- [x] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile/data`
+- [x] 7. Actualizar `Home.tsx` — cambiar paths de `system/radar_match` y `system/colombia_match`
+- [x] 8. `npm run build` — sin errores
 - [ ] 9. Probar todas las funcionalidades en `npm run dev`

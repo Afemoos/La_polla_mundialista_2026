@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserBracket, saveUserBracket, getTeamsByGroup, getTeamPlayers } from '../services/firestore';
-import type { Bracket, WorldCupTeam, Player } from '../types/firestore';
+import { getGoleadorPick, saveUserPick, getTournamentTeams, getTournamentPlayers, getUserProfile } from '../services/firestore';
+import { arrayUnion, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import type { GoleadorPick, WorldCupTeam, Player, UserProfile } from '../types/firestore';
 import { Target, Save, ChevronDown } from 'lucide-react';
 
 interface TeamWithId extends WorldCupTeam {
@@ -12,7 +14,8 @@ const GROUPS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
 export default function MiGoleador() {
   const { currentUser } = useAuth() || {};
-  const [bracket, setBracket] = useState<Bracket | null>(null);
+  const [pick, setPick] = useState<GoleadorPick | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [selectedGroup, setSelectedGroup] = useState('');
@@ -31,8 +34,10 @@ export default function MiGoleador() {
 
   useEffect(() => {
     if (!currentUser) return;
-    getUserBracket(currentUser.uid)
-      .then(b => { setBracket(b); })
+    Promise.all([
+      getGoleadorPick(currentUser.uid, 'world_cup_2026'),
+      getUserProfile(currentUser.uid),
+    ]).then(([p, pr]) => { setPick(p); setProfile(pr); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [currentUser]);
@@ -55,7 +60,8 @@ export default function MiGoleador() {
     if (!group) { setTeams([]); return; }
     setLoadingTeams(true);
     try {
-      const t = await getTeamsByGroup(group);
+      const all = await getTournamentTeams('world_cup_2026');
+      const t = all.filter(team => team.group === group);
       setTeams(t as TeamWithId[]);
     } catch {
       setTeams([]);
@@ -68,10 +74,10 @@ export default function MiGoleador() {
     setTeamOpen(false);
     setPlayers([]);
     setSelectedPlayer(null);
-    if (!team || !selectedGroup || !team.id) return;
+    if (!team || !selectedGroup) return;
     setLoadingPlayers(true);
     try {
-      const p = await getTeamPlayers(team.id, selectedGroup);
+      const p = await getTournamentPlayers('world_cup_2026', team.apiId);
       setPlayers(p);
     } catch {
       setPlayers([]);
@@ -83,31 +89,27 @@ export default function MiGoleador() {
     if (!currentUser || !selectedPlayer || !selectedTeam) return;
     setSaving(true);
     setError('');
-    const alreadyPaid = bracket?.tokensSpent?.goleador && bracket.tokensSpent.goleador > 0;
+    const alreadyPaid = profile?.paidFeatures?.includes('goleador');
     try {
-      await saveUserBracket(
-        currentUser.uid,
-        {
-          email: currentUser.email || '',
-          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedTeam.name, photo: selectedPlayer.photo },
-        },
-        alreadyPaid ? undefined : { field: 'goleador', amount: 10 }
-      );
-      setBracket(prev => {
-        const updated: Bracket = {
-          ...(prev || {} as Bracket),
-          goleador: { apiId: selectedPlayer.apiId, name: selectedPlayer.name, teamName: selectedTeam.name, photo: selectedPlayer.photo },
-          userId: currentUser.uid,
-          email: currentUser.email || '',
-          matches: prev?.matches || [],
-          tokensSpent: { bracket: prev?.tokensSpent?.bracket || 0, campeon: prev?.tokensSpent?.campeon || 0, goleador: alreadyPaid ? (prev?.tokensSpent?.goleador || 10) : 10 },
-          score: prev?.score ?? null,
-          campeonResult: prev?.campeonResult ?? null,
-          goleadorResult: prev?.goleadorResult ?? null,
-          createdAt: (prev?.createdAt || null) as any,
-          updatedAt: null as any,
-        };
-        return updated;
+      await saveUserPick(currentUser.uid, 'world_cup_2026', 'goleador', {
+        playerApiId: selectedPlayer.apiId,
+        playerName: selectedPlayer.name,
+        playerPhoto: selectedPlayer.photo,
+        teamName: selectedTeam.name,
+      }, alreadyPaid ? undefined : { amount: 10 });
+      if (!alreadyPaid) {
+        await updateDoc(doc(db, 'users', currentUser.uid, 'profile', 'data'), {
+          paidFeatures: arrayUnion('goleador')
+        });
+      }
+      setPick({
+        playerApiId: selectedPlayer.apiId,
+        playerName: selectedPlayer.name,
+        playerPhoto: selectedPlayer.photo,
+        teamName: selectedTeam.name,
+        result: null,
+        createdAt: null as any,
+        deletedAt: null,
       });
     } catch {
       setError('Error al guardar');
@@ -129,14 +131,14 @@ export default function MiGoleador() {
           10 tokens — selecciona el jugador que crees que marcará más goles
         </p>
 
-        {bracket?.goleador && (
+        {pick && (
           <div style={{ textAlign: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--color-success-bg)', borderRadius: '12px', border: '1px solid var(--color-success)' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>Tu predicción actual</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-              <img src={bracket.goleador.photo} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+              <img src={pick.playerPhoto} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
               <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{bracket.goleador.name}</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{bracket.goleador.teamName}</div>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{pick.playerName}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{pick.teamName}</div>
               </div>
             </div>
           </div>
@@ -267,7 +269,7 @@ export default function MiGoleador() {
           )}
         </div>
 
-        {selectedPlayer && !bracket?.goleador && (
+        {selectedPlayer && !pick && (
           <div style={{ marginBottom: '1.5rem', padding: '1.2rem', background: 'var(--color-warning-bg)', borderRadius: '12px', border: '1px solid var(--primary)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1rem' }}>
               <img src={selectedPlayer.photo} alt="" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
@@ -294,7 +296,7 @@ export default function MiGoleador() {
           style={{ width: '100%', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Save size={18} />
-          {bracket?.tokensSpent?.goleador ? 'Actualizar' : 'Guardar (10 tokens)'}
+          {profile?.paidFeatures?.includes('goleador') ? 'Actualizar' : 'Guardar (10 tokens)'}
         </button>
       </div>
     </div>

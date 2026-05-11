@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, onSnapshot, collection, query, where, setDoc, updateDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, collection, setDoc, updateDoc, serverTimestamp, increment, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Prediction } from '../types/firestore';
 import { Calendar, MapPin, Lock, Edit3, Save, AlertTriangle, Coins } from 'lucide-react';
@@ -23,8 +23,9 @@ interface WorldCupMatch {
 
 interface UserPredictionState {
   exists: boolean;
-  docId?: string;
-  prediction?: string;
+  matchId?: string;
+  homeScore?: number;
+  awayScore?: number;
   lockedAt?: Date;
 }
 
@@ -59,12 +60,9 @@ function MatchCard({
   const isLocked = (hasPrediction && is48hExceeded) || isPreMatchLocked;
 
   const prepopulateScores = () => {
-    if (userPrediction.prediction && !isEditing) {
-      const parts = userPrediction.prediction.split(' - ');
-      if (parts.length === 2) {
-        setHomeScore(parts[0] === '' ? '' : Number(parts[0]));
-        setAwayScore(parts[1] === '' ? '' : Number(parts[1]));
-      }
+    if (userPrediction.homeScore !== undefined && !isEditing) {
+      setHomeScore(userPrediction.homeScore);
+      setAwayScore(userPrediction.awayScore || 0);
     }
   };
 
@@ -94,21 +92,18 @@ function MatchCard({
     setSaving(true);
     try {
       // AI-NOTE: ID compuesto uid_matchId previene duplicados
-      const predictionDocRef = doc(db, 'predictions', `${currentUser!.uid}_${match.id}`);
+      const predictionDocRef = doc(db, `users/${currentUser!.uid}/tournaments/world_cup_2026/predictions`, match.id);
       await setDoc(predictionDocRef, {
-        email: currentUser?.email,
-        type: 'POLla_MUNDIALISTA',
-        fixtureId: match.id,
+        matchId: match.id,
         matchDetails: `${match.homeTeam} vs ${match.awayTeam}`,
-        prediction: predictionStr,
-        homeLogo: match.homeFlag || '',
-        awayLogo: match.awayFlag || '',
+        homeScore: Number(homeScore),
+        awayScore: Number(awayScore),
         tokenCost: match.tokenCost,
         lockedAt: serverTimestamp(),
         timestamp: serverTimestamp()
       });
 
-      await updateDoc(doc(db, 'users', currentUser!.uid), {
+      await updateDoc(doc(db, 'users', currentUser!.uid, 'profile', 'data'), {
         tokens: increment(-match.tokenCost)
       });
 
@@ -127,7 +122,7 @@ function MatchCard({
       return;
     }
 
-    if (!userPrediction.docId) return;
+    if (!userPrediction.matchId) return;
 
     const predictionStr = `${homeScore} - ${awayScore}`;
     const isConfirmed = window.confirm(
@@ -137,8 +132,9 @@ function MatchCard({
 
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'predictions', userPrediction.docId), {
-        prediction: predictionStr,
+      await updateDoc(doc(db, `users/${currentUser!.uid}/tournaments/world_cup_2026/predictions`, userPrediction.matchId), {
+        homeScore: Number(homeScore),
+        awayScore: Number(awayScore),
         lockedAt: serverTimestamp()
       });
       alert('Marcador actualizado exitosamente.');
@@ -151,7 +147,7 @@ function MatchCard({
   };
 
   const handleLockNow = async () => {
-    if (!userPrediction.docId) return;
+    if (!userPrediction.matchId) return;
     const isConfirmed = window.confirm(
       '¿Estás seguro de bloquear definitivamente tu predicción? No podrás modificarla bajo ninguna circunstancia.'
     );
@@ -161,7 +157,7 @@ function MatchCard({
     try {
       // AI-NOTE: Forzar bloqueo inmediato restando 49h a lockedAt usando Timestamp de Firestore
       const pastTime = new Date(now.getTime() - 49 * 60 * 60 * 1000);
-      await updateDoc(doc(db, 'predictions', userPrediction.docId), {
+      await updateDoc(doc(db, `users/${currentUser!.uid}/tournaments/world_cup_2026/predictions`, userPrediction.matchId), {
         lockedAt: Timestamp.fromDate(pastTime)
       });
       alert('Predicción bloqueada definitivamente.');
@@ -297,7 +293,7 @@ function MatchCard({
         {match.isDefined && canModify && !isEditing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Marcador actual: <strong style={{ color: 'var(--text-main)' }}>{userPrediction.prediction}</strong>
+              Marcador actual: <strong style={{ color: 'var(--text-main)' }}>{userPrediction.homeScore} - {userPrediction.awayScore}</strong>
             </div>
             <button
               className="btn-primary"
@@ -365,11 +361,7 @@ export default function PollaMundialista() {
     });
 
     // Escuchar predicciones del usuario (tipo Polla Mundialista)
-    const q = query(
-      collection(db, 'predictions'),
-      where('email', '==', currentUser.email),
-      where('type', '==', 'POLla_MUNDIALISTA')
-    );
+    const q = collection(db, `users/${currentUser.uid}/tournaments/world_cup_2026/predictions`);
     const unsubPredictions = onSnapshot(q, (snap) => {
       const preds: Prediction[] = [];
       snap.forEach((d) => {
@@ -379,7 +371,7 @@ export default function PollaMundialista() {
     });
 
     // AI-NOTE: Intentar cargar partidos desde Firestore, usar dummies como fallback
-    const unsubMatches = onSnapshot(doc(db, 'system', 'worldcup_path'), (snap) => {
+    const unsubMatches = onSnapshot(doc(db, 'tournaments/world_cup_2026/system', 'worldcup_path'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         if (data.matches && Array.isArray(data.matches)) {
@@ -397,12 +389,14 @@ export default function PollaMundialista() {
   }, [currentUser]);
 
   const getPredictionForMatch = (matchId: string): UserPredictionState => {
-    const pred = userPredictions.find(p => p.fixtureId === matchId);
+    const pred = userPredictions.find(p => p.id === matchId);
     if (!pred) return { exists: false };
+    const data = pred as any;
     return {
       exists: true,
-      docId: pred.id,
-      prediction: pred.prediction,
+      matchId: pred.id,
+      homeScore: data.homeScore,
+      awayScore: data.awayScore,
       lockedAt: pred.lockedAt?.toDate ? pred.lockedAt.toDate() : undefined
     };
   };

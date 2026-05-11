@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { onSnapshot } from 'firebase/firestore';
-import { getUserBetsQuery } from '../services/firestore';
+import { onSnapshot, collection } from 'firebase/firestore';
+import { db } from '../firebase';
 import type { Prediction } from '../types/firestore';
 import { Clock } from 'lucide-react';
 
@@ -10,14 +10,22 @@ export default function MisApuestas() {
     const [bets, setBets] = useState<Prediction[]>([]);
 
     useEffect(() => {
-        if (!currentUser?.email) return;
-
-        const q = getUserBetsQuery(currentUser.email);
-
+        if (!currentUser?.uid) return;
+        const q = collection(db, `users/${currentUser.uid}/tournaments/world_cup_2026/predictions`);
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const betsArray: Prediction[] = [];
             querySnapshot.forEach((doc) => {
-                betsArray.push({ id: doc.id, ...doc.data() } as Prediction);
+                const data = doc.data();
+                betsArray.push({
+                    id: doc.id,
+                    type: 'POLla_MUNDIALISTA',
+                    matchDetails: data.matchDetails,
+                    prediction: `${data.homeScore} - ${data.awayScore}`,
+                    result: data.result,
+                    finalScore: data.finalScore,
+                    timestamp: data.createdAt,
+                    tokenCost: data.tokenCost,
+                } as Prediction);
             });
             
             betsArray.sort((a, b) => {

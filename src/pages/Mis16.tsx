@@ -7,7 +7,7 @@ export default function Mis16() {
   const [phase, setPhase] = useState<'loading' | 'groups' | 'knockout'>('loading');
 
   useEffect(() => {
-    getDoc(doc(db, 'system', 'round_of_32_matches')).then(snap => {
+    getDoc(doc(db, 'tournaments/world_cup_2026/system', 'round_of_32_matches')).then(snap => {
       if (!snap.exists() || !snap.data().matches || snap.data().matches.length === 0) {
         setPhase('groups');
       } else {

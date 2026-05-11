@@ -20,7 +20,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   useEffect(() => {
     if (!authCounter?.currentUser) return;
-    const unsub = onSnapshot(doc(db, 'users', authCounter.currentUser.uid), (snap) => {
+    const unsub = onSnapshot(doc(db, 'users', authCounter.currentUser.uid, 'profile', 'data'), (snap) => {
       if (snap.exists()) {
         setTokens(snap.data().tokens || 0);
       }

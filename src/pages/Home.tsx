@@ -58,7 +58,7 @@ export default function Home() {
     const [colombiaMatch, setColombiaMatch] = useState<any>(null);
 
     useEffect(() => {
-        const unsubGlobal = onSnapshot(doc(db, "system", "radar_match"), (docSnap) => {
+        const unsubGlobal = onSnapshot(doc(db, "tournaments/world_cup_2026/system", "radar_match"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setGlobalMatch({
@@ -72,7 +72,7 @@ export default function Home() {
             }
         });
 
-        const unsubColombia = onSnapshot(doc(db, "system", "colombia_match"), (docSnap) => {
+        const unsubColombia = onSnapshot(doc(db, "tournaments/world_cup_2026/system", "colombia_match"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setColombiaMatch({
