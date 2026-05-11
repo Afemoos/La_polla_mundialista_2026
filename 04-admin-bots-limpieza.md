@@ -181,7 +181,7 @@ docs = db.collection_group("predictions").stream()
 - [x] 9. Actualizar `contabilidad.py` con `collection_group`
 
 ### Limpieza (ejecutar DESPUÉS de bots)
-- [ ] 10. Verificar todo en preview
-- [ ] 11. Ejecutar formateo de fábrica
-- [ ] 12. Eliminar colecciones antiguas + docs sueltos de system/
-- [ ] 13. Simplificar `firestore.rules` (solo reglas nuevas) y desplegar
+- [x] 10. Verificar todo en preview
+- [x] 11. Ejecutar formateo de fábrica
+- [x] 12. Eliminar colecciones antiguas + docs sueltos de system/
+- [x] 13. Simplificar `firestore.rules` (solo reglas nuevas) y desplegar
