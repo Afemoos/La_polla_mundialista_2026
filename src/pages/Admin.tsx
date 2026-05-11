@@ -155,7 +155,7 @@ export default function Admin() {
             for (const u of usersSnap.docs) {
                 const uid = u.data().uid;
                 for (const type of ['bracket', 'campeon', 'goleador']) {
-                    const ref = doc(db, `users/${uid}/tournaments/world_cup_2026/${type}`);
+                    const ref = doc(db, `users/${uid}/tournaments/world_cup_2026/${type}`, 'data');
                     const snap = await getDoc(ref);
                     if (snap.exists()) bracketDocs.push(ref.path);
                 }
