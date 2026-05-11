@@ -107,6 +107,8 @@ Firestore tiene un límite de 20,000 escrituras/día en el plan gratuito. Borrar
 4. **Rate limiting:** Si el script escribe más de 100 documentos, agregar `time.sleep(0.5)` entre lotes para no agotar el quota.
 5. **Respaldo:** Las colecciones antiguas no se eliminan hasta que las nuevas estén verificadas y funcionando en producción.
 6. **Quota:** Si aparece `429 Quota exceeded`, detener todas las escrituras. Esperar al reset diario. No reintentar en bucle.
+7. **⚠️ `collectionGroup()` en Web SDK ≠ Admin SDK:** El Admin SDK (Python) ejecuta `collectionGroup` sin necesidad de índices explícitos. El Web SDK (frontend) REQUIERE índices explícitos desplegados en `firestore.indexes.json`. Sin ellos, cualquier query con `collectionGroup()` falla con "Missing or insufficient permissions" — un error engañoso porque parece un problema de reglas pero es falta de índices. Si necesitas `collectionGroup` en el frontend, despliega los índices primero con `npx firebase deploy --only firestore:indexes`.
+8. **Firestore paths deben tener segmentos PARES:** Un documento necesita número par de segmentos en su path (`collection/doc` = 2, `collection/doc/sub/doc` = 4, `collection/doc/sub/doc/sub2/doc2` = 6). Un número impar indica colección, no documento. Ej: `users/{uid}/profile` (3 segmentos) ❌ → `users/{uid}/profile/data` (4 segmentos) ✅.
 
 ## Manejo de Errores y Estabilidad
 
