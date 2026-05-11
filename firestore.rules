@@ -13,126 +13,6 @@ service cloud.firestore {
       ];
     }
 
-    match /system/radar_match {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin() &&
-        request.resource.data.homeTeam is string &&
-        request.resource.data.awayTeam is string &&
-        request.resource.data.homeFlag is string &&
-        request.resource.data.awayFlag is string &&
-        request.resource.data.stadium is string &&
-        request.resource.data.date is string &&
-        request.resource.data.probHome is int &&
-        request.resource.data.probDraw is int &&
-        request.resource.data.probAway is int &&
-        request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
-    }
-
-    match /system/colombia_match {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin() &&
-        request.resource.data.homeTeam is string &&
-        request.resource.data.awayTeam is string &&
-        request.resource.data.homeFlag is string &&
-        request.resource.data.awayFlag is string &&
-        request.resource.data.stadium is string &&
-        request.resource.data.date is string &&
-        request.resource.data.probHome is int &&
-        request.resource.data.probDraw is int &&
-        request.resource.data.probAway is int &&
-        request.resource.data.probHome + request.resource.data.probDraw + request.resource.data.probAway == 100;
-    }
-
-    match /system/recent_results {
-      allow read: if isAuthenticated();
-      allow write: if false; // Solo escribe el bot via Admin SDK
-    }
-
-    match /system/api_status {
-      allow read: if isAdmin();
-      allow write: if false; // Solo escribe el bot via Admin SDK
-    }
-
-    match /users/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
-      allow create: if (isAuthenticated() && request.auth.uid == uid &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == request.auth.token.email &&
-        request.resource.data.tokens == 0) || 
-        (isAdmin() && request.resource.data.tokens == 0);
-      allow update: if (isAdmin() &&
-        request.resource.data.tokens is int &&
-        request.resource.data.tokens >= 0) ||
-        (isAuthenticated() && request.auth.uid == uid &&
-        request.resource.data.tokens is int &&
-        request.resource.data.tokens >= 0 &&
-        request.resource.data.tokens <= resource.data.tokens);
-      allow delete: if isAdmin();
-    }
-
-    match /system/worldcup_path {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /predictions/{predictionId} {
-      allow read: if isAuthenticated();
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.email == request.auth.token.email &&
-        request.resource.data.type == 'POLla_MUNDIALISTA' &&
-        request.resource.data.matchDetails is string &&
-        request.resource.data.prediction is string &&
-        (!('result' in request.resource.data) || request.resource.data.result == null);
-
-      allow update: if isAdmin() || (
-        isAuthenticated() &&
-        request.resource.data.email == request.auth.token.email &&
-        (!('result' in resource.data) || resource.data.result == null) &&
-        resource.data.type == 'POLla_MUNDIALISTA' &&
-        request.resource.data.prediction is string
-      );
-      
-      allow delete: if isAdmin();
-    }
-
-    match /Teams/{tournament}/{group}/{teamDoc} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-
-      match /Players/{playerDoc} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
-      }
-    }
-
-    match /brackets/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId &&
-        request.resource.data.userId == userId &&
-        request.resource.data.email == request.auth.token.email &&
-        (!('score' in request.resource.data) || request.resource.data.score == null) &&
-        (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == null) &&
-        (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == null);
-      allow update: if isAuthenticated() && request.auth.uid == userId &&
-        request.resource.data.userId == userId &&
-        (!('score' in request.resource.data) || request.resource.data.score == resource.data.score) &&
-        (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == resource.data.campeonResult) &&
-        (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == resource.data.goleadorResult);
-      allow delete: if isAdmin();
-    }
-
-    match /flat_players/{playerId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /system/round_of_32_matches {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
-    }
-
-    // ======= NUEVAS REGLAS (Data-base migration) =======
     match /tournaments/{tournamentId} {
       allow read: if isAuthenticated();
       match /teams/{teamCode} {
@@ -148,31 +28,31 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
     }
-    match /users/{innerUid} {
+    match /users/{uid} {
       match /profile/{profileDoc} {
-        allow read, update: if isAuthenticated() && (request.auth.uid == innerUid || isAdmin());
-        allow create: if request.auth.uid == innerUid;
+        allow read, update: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+        allow create: if request.auth.uid == uid;
         allow delete: if isAdmin();
       }
       match /tournaments/{t} {
         match /predictions/{matchId} {
-          allow read: if request.auth.uid == innerUid || isAdmin();
-          allow create, update: if request.auth.uid == innerUid;
+          allow read: if request.auth.uid == uid || isAdmin();
+          allow create, update: if request.auth.uid == uid;
           allow delete: if isAdmin();
         }
         match /bracket/{doc} {
-          allow read: if request.auth.uid == innerUid || isAdmin();
-          allow create, update: if request.auth.uid == innerUid;
+          allow read: if request.auth.uid == uid || isAdmin();
+          allow create, update: if request.auth.uid == uid;
           allow delete: if isAdmin();
         }
         match /campeon/{doc} {
-          allow read: if request.auth.uid == innerUid || isAdmin();
-          allow create, update: if request.auth.uid == innerUid;
+          allow read: if request.auth.uid == uid || isAdmin();
+          allow create, update: if request.auth.uid == uid;
           allow delete: if isAdmin();
         }
         match /goleador/{doc} {
-          allow read: if request.auth.uid == innerUid || isAdmin();
-          allow create, update: if request.auth.uid == innerUid;
+          allow read: if request.auth.uid == uid || isAdmin();
+          allow create, update: if request.auth.uid == uid;
           allow delete: if isAdmin();
         }
       }
