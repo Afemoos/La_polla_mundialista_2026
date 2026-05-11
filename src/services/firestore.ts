@@ -166,23 +166,27 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function getUserPredictions(uid: string, tournamentId: string): Promise<PredictionV2[]> {
   const ref = collection(db, `users/${uid}/tournaments/${tournamentId}/predictions`);
-  const snap = await getDocs(ref);
+  const q = query(ref, where('deletedAt', '==', null));
+  const snap = await getDocs(q);
   return snap.docs.map(d => ({ ...d.data() })) as PredictionV2[];
 }
 
 export async function getUserBracketV2(uid: string, tournamentId: string): Promise<BracketV2 | null> {
   const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'bracket', 'data'));
-  return snap.exists() ? (snap.data() as BracketV2) : null;
+  if (snap.exists() && !snap.data().deletedAt) return snap.data() as BracketV2;
+  return null;
 }
 
 export async function getCampeonPick(uid: string, tournamentId: string): Promise<CampeonPick | null> {
   const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'campeon', 'data'));
-  return snap.exists() ? (snap.data() as CampeonPick) : null;
+  if (snap.exists() && !snap.data().deletedAt) return snap.data() as CampeonPick;
+  return null;
 }
 
 export async function getGoleadorPick(uid: string, tournamentId: string): Promise<GoleadorPick | null> {
   const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'goleador', 'data'));
-  return snap.exists() ? (snap.data() as GoleadorPick) : null;
+  if (snap.exists() && !snap.data().deletedAt) return snap.data() as GoleadorPick;
+  return null;
 }
 
 export async function saveUserPick(
@@ -196,9 +200,9 @@ export async function saveUserPick(
   if (tokenDeduction) {
     const batch = writeBatch(db);
     batch.update(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(-tokenDeduction.amount) });
-    batch.set(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
+    batch.set(ref, { ...data, deletedAt: null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
     await batch.commit();
   } else {
-    await setDoc(ref, { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(ref, { ...data, deletedAt: null, updatedAt: serverTimestamp() }, { merge: true });
   }
 }

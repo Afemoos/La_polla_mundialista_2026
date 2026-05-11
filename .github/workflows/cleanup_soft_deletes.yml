@@ -1,0 +1,19 @@
+name: Cleanup Soft Deletes
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Domingos a medianoche UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install firebase-admin
+      - env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python legacy_python/cleanup_soft_deletes.py

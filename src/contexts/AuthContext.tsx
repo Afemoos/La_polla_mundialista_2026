@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: user.email,
                             tokens: oldData.tokens || 0,
                             paidFeatures: [],
+                            deletedAt: null,
                             createdAt: oldData.createdAt || serverTimestamp(),
                             updatedAt: serverTimestamp(),
                         });
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             email: user.email,
                             tokens: 0,
                             paidFeatures: [],
+                            deletedAt: null,
                             createdAt: serverTimestamp(),
                             updatedAt: serverTimestamp(),
                         });

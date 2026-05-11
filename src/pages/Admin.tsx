@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query } from 'firebase/firestore';
+import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, Trash2 } from 'lucide-react';
@@ -144,7 +144,7 @@ export default function Admin() {
                 if (currentPredBatch.length > 0) predBatches.push(currentPredBatch);
                 for (const batch of predBatches) {
                     const wb = writeBatch(db);
-                    batch.forEach(p => wb.delete(doc(db, p)));
+                    batch.forEach(p => wb.update(doc(db, p), { deletedAt: serverTimestamp() }));
                     await wb.commit();
                     deletedPredictions += batch.length;
                 }
@@ -154,7 +154,7 @@ export default function Admin() {
                     const ref = doc(db, `users/${user.uid}/tournaments/world_cup_2026/${type}`, 'data');
                     const snap = await getDoc(ref);
                     if (snap.exists()) {
-                        await deleteDoc(ref);
+                        await updateDoc(ref, { deletedAt: serverTimestamp() });
                         deletedBrackets++;
                     }
                 }

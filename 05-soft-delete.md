@@ -158,13 +158,13 @@ Solo cuando TODO funcione en preview.
 
 ## To-Do List
 
-- [ ] 1. Agregar `deletedAt: null` a AuthContext (creación de perfil)
-- [ ] 2. Agregar `deletedAt: null` a PollaMundialista (creación de predicción)
-- [ ] 3. Agregar `deletedAt: null` a saveUserPick (bracket/campeón/goleador)
-- [ ] 4. Filtrar `where('deletedAt', '==', null)` en todas las lecturas
-- [ ] 5. Actualizar formateo de fábrica a soft-delete
-- [ ] 6. Crear `legacy_python/cleanup_soft_deletes.py`
-- [ ] 7. Crear `.github/workflows/cleanup_soft_deletes.yml`
-- [ ] 8. `npm run build`
+- [x] 1. Agregar `deletedAt: null` a AuthContext (creación de perfil)
+- [x] 2. Agregar `deletedAt: null` a PollaMundialista (creación de predicción)
+- [x] 3. Agregar `deletedAt: null` a saveUserPick (bracket/campeón/goleador)
+- [x] 4. Filtrar `where('deletedAt', '==', null)` en todas las lecturas
+- [x] 5. Actualizar formateo de fábrica a soft-delete
+- [x] 6. Crear `legacy_python/cleanup_soft_deletes.py`
+- [x] 7. Crear `.github/workflows/cleanup_soft_deletes.yml`
+- [x] 8. `npm run build`
 - [ ] 9. Deploy a preview y probar todas las funcionalidades
 - [ ] 10. Merge a main

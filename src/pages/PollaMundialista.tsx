@@ -100,6 +100,7 @@ function MatchCard({
         homeScore: Number(homeScore),
         awayScore: Number(awayScore),
         tokenCost: match.tokenCost,
+        deletedAt: null,
         lockedAt: serverTimestamp(),
         timestamp: serverTimestamp()
       });
