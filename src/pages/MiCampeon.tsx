@@ -69,6 +69,7 @@ export default function MiCampeon() {
         await updateDoc(doc(db, 'users', currentUser.uid, 'profile', 'data'), {
           paidFeatures: arrayUnion('campeon')
         });
+        setProfile(prev => prev ? { ...prev, paidFeatures: [...(prev.paidFeatures || []), 'campeon'] } : null);
       }
       setPick({
         teamApiId: selectedTeam.apiId,
@@ -79,6 +80,7 @@ export default function MiCampeon() {
         createdAt: null as any,
         deletedAt: null,
       });
+      setError('');
     } catch {
       setError('Error al guardar');
     }
@@ -222,7 +224,7 @@ export default function MiCampeon() {
           style={{ width: '100%', padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Save size={18} />
-          {profile?.paidFeatures?.includes('campeon') ? 'Actualizar' : 'Guardar (10 tokens)'}
+          {pick ? 'Modificar predicción' : 'Guardar (10 tokens)'}
         </button>
       </div>
     </div>
