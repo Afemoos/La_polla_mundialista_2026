@@ -354,7 +354,7 @@ export default function PollaMundialista() {
     if (!currentUser) return;
 
     // Escuchar tokens del usuario
-    const unsubTokens = onSnapshot(doc(db, 'users', currentUser.uid), (snap) => {
+    const unsubTokens = onSnapshot(doc(db, 'users', currentUser.uid, 'profile', 'data'), (snap) => {
       if (snap.exists()) {
         setUserTokens(snap.data().tokens || 0);
       }

@@ -171,17 +171,17 @@ export async function getUserPredictions(uid: string, tournamentId: string): Pro
 }
 
 export async function getUserBracketV2(uid: string, tournamentId: string): Promise<BracketV2 | null> {
-  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/bracket`));
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'bracket', 'data'));
   return snap.exists() ? (snap.data() as BracketV2) : null;
 }
 
 export async function getCampeonPick(uid: string, tournamentId: string): Promise<CampeonPick | null> {
-  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/campeon`));
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'campeon', 'data'));
   return snap.exists() ? (snap.data() as CampeonPick) : null;
 }
 
 export async function getGoleadorPick(uid: string, tournamentId: string): Promise<GoleadorPick | null> {
-  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}/goleador`));
+  const snap = await getDoc(doc(db, `users/${uid}/tournaments/${tournamentId}`, 'goleador', 'data'));
   return snap.exists() ? (snap.data() as GoleadorPick) : null;
 }
 
@@ -192,7 +192,7 @@ export async function saveUserPick(
   data: Record<string, unknown>,
   tokenDeduction?: { amount: number }
 ): Promise<void> {
-  const ref = doc(db, `users/${uid}/tournaments/${tournamentId}/${type}`);
+  const ref = doc(db, `users/${uid}/tournaments/${tournamentId}`, type, 'data');
   if (tokenDeduction) {
     const batch = writeBatch(db);
     batch.update(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(-tokenDeduction.amount) });

@@ -160,17 +160,17 @@ service cloud.firestore {
           allow create, update: if request.auth.uid == innerUid;
           allow delete: if isAdmin();
         }
-        match /bracket {
+        match /bracket/{doc} {
           allow read: if request.auth.uid == innerUid || isAdmin();
           allow create, update: if request.auth.uid == innerUid;
           allow delete: if isAdmin();
         }
-        match /campeon {
+        match /campeon/{doc} {
           allow read: if request.auth.uid == innerUid || isAdmin();
           allow create, update: if request.auth.uid == innerUid;
           allow delete: if isAdmin();
         }
-        match /goleador {
+        match /goleador/{doc} {
           allow read: if request.auth.uid == innerUid || isAdmin();
           allow create, update: if request.auth.uid == innerUid;
           allow delete: if isAdmin();
