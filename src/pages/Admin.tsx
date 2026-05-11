@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, collection, updateDoc, increment, setDoc, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query, serverTimestamp } from 'firebase/firestore';
+import { onSnapshot, doc, collection, updateDoc, increment, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangle, Trash2 } from 'lucide-react';
