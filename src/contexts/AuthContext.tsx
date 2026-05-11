@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if(user && user.email) {
                 setIsAdmin(ADMIN_EMAILS.includes(user.email));
                 // AI-NOTE: Migración a nueva estructura. Intentar leer de la nueva ruta primero.
-                const newProfileRef = doc(db, 'users', user.uid, 'profile');
+                const newProfileRef = doc(db, 'users', user.uid, 'profile', 'data');
                 const newProfileSnap = await getDoc(newProfileRef);
                 
                 if (!newProfileSnap.exists()) {

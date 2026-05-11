@@ -1,7 +1,7 @@
 # Data-base — Fase 3 (Parte 1): AuthContext
 
 **Depende de:** `01-nuevas-colecciones.md` completado.  
-**Objetivo:** Migrar `AuthContext.tsx` para crear `users/{uid}/profile` al hacer login. El Sidebar y los componentes de predicción se actualizan en documentos posteriores para mantener consistencia de tokens.
+**Objetivo:** Migrar `AuthContext.tsx` para crear `users/{uid}/profile/data/data` al hacer login. El Sidebar y los componentes de predicción se actualizan en documentos posteriores para mantener consistencia de tokens.
 
 ---
 
@@ -14,15 +14,15 @@ Actualmente:
 - `PollaMundialista.tsx` descuenta tokens de `users/{uid}` (línea ~165)
 
 En la nueva estructura:
-- El perfil del usuario vive en `users/{uid}/profile`
+- El perfil del usuario vive en `users/{uid}/profile/data/data`
 - Los tokens y `paidFeatures` están en ese documento
 
 **Estrategia:** Durante la migración, el `AuthContext` debe:
-1. Al hacer login, verificar si `users/{uid}/profile` existe
+1. Al hacer login, verificar si `users/{uid}/profile/data/data` existe
 2. Si no existe, crearlo copiando los datos de `users/{uid}` (documento antiguo)
 3. Si existe, usarlo normalmente
 
-Esto permite que usuarios existentes (con datos en `users/{uid}`) y nuevos usuarios (con datos en `users/{uid}/profile`) funcionen simultáneamente.
+Esto permite que usuarios existentes (con datos en `users/{uid}`) y nuevos usuarios (con datos en `users/{uid}/profile/data/data`) funcionen simultáneamente.
 
 ---
 
@@ -95,19 +95,19 @@ import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 npm run build
 ```
 
-Debe compilar sin errores. El AuthContext ahora crea `users/{uid}/profile` automáticamente.
+Debe compilar sin errores. El AuthContext ahora crea `users/{uid}/profile/data/data` automáticamente.
 
 ### 2.2 Probar manualmente
 
 1. Iniciar `npm run dev`
-2. Iniciar sesión con una cuenta existente → revisar en Firestore que se creó `users/{uid}/profile` con los tokens migrados
-3. Iniciar sesión con una cuenta nueva → revisar que se creó `users/{uid}/profile` con tokens=0
+2. Iniciar sesión con una cuenta existente → revisar en Firestore que se creó `users/{uid}/profile/data/data` con los tokens migrados
+3. Iniciar sesión con una cuenta nueva → revisar que se creó `users/{uid}/profile/data/data` con tokens=0
 4. Cerrar sesión y volver a entrar — el perfil ya existe, no se sobrescribe
 
 ---
 
 ## To-Do List
 
-- [x] 1. Actualizar `AuthContext.tsx`: migrar creación/lectura de `users/{uid}` a `users/{uid}/profile` con soporte para datos antiguos
+- [x] 1. Actualizar `AuthContext.tsx`: migrar creación/lectura de `users/{uid}` a `users/{uid}/profile/data/data` con soporte para datos antiguos
 - [x] 2. `npm run build` — sin errores
 - [x] 3. Probar login con cuenta existente y nueva en local

@@ -272,8 +272,8 @@ Debe compilar sin errores. Las funciones antiguas siguen existiendo y siendo usa
 ## To-Do List
 
 - [x] 1.1 Modificar `populate_teams.py` para escribir en nuevas rutas
-- [x] 1.2 Ejecutar `populate_teams.py` (46/48 equipos, 1616/1616 jugadores — 2 equipos pendientes por quota)
-- [x] 1.3 Copiar `system/` → `tournaments/world_cup_2026/system/` (pendiente por quota, se hará manual cuando resetee)
+- [x] 1.2 Ejecutar `populate_teams.py` (48/48 equipos, 1616/1616 jugadores ✅)
+- [x] 1.3 Copiar `system/` → `tournaments/world_cup_2026/system/` (4/6 — api_status y round_of_32_matches no existen en system/ aún)
 - [x] 1.4 Actualizar `firestore.rules` con reglas antiguas + nuevas
 - [x] 1.5 Desplegar reglas (`npx firebase deploy --only firestore:rules`)
 - [x] 2.1 Crear nuevas interfaces en `src/types/firestore.ts` (sin eliminar antiguas)

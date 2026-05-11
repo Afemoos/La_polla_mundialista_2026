@@ -160,7 +160,7 @@ export async function getTournamentPlayers(tournamentId: string, teamApiId: numb
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const snap = await getDoc(doc(db, 'users', uid, 'profile'));
+  const snap = await getDoc(doc(db, 'users', uid, 'profile', 'data'));
   return snap.exists() ? (snap.data() as UserProfile) : null;
 }
 
@@ -195,7 +195,7 @@ export async function saveUserPick(
   const ref = doc(db, `users/${uid}/tournaments/${tournamentId}/${type}`);
   if (tokenDeduction) {
     const batch = writeBatch(db);
-    batch.update(doc(db, 'users', uid, 'profile'), { tokens: increment(-tokenDeduction.amount) });
+    batch.update(doc(db, 'users', uid, 'profile', 'data'), { tokens: increment(-tokenDeduction.amount) });
     batch.set(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
     await batch.commit();
   } else {

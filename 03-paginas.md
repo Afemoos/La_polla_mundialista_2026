@@ -224,7 +224,7 @@ getDoc(doc(db, 'tournaments/world_cup_2026/system', 'round_of_32_matches'))
 
 Archivo: `src/components/Sidebar.tsx`
 
-El Sidebar debe leer tokens de `users/{uid}/profile` (nueva ruta). Este cambio se hace AQUÍ (junto con PollaMundialista) para mantener consistencia: ambos componentes leen y escriben tokens en la misma ruta.
+El Sidebar debe leer tokens de `users/{uid}/profile/data/data` (nueva ruta). Este cambio se hace AQUÍ (junto con PollaMundialista) para mantener consistencia: ambos componentes leen y escriben tokens en la misma ruta.
 
 ```typescript
 useEffect(() => {
@@ -278,7 +278,7 @@ Probar en `npm run dev`:
 - [ ] 3. Actualizar `MiCampeon.tsx` (lectura, equipos, guardado con paidFeatures)
 - [ ] 4. Actualizar `MiGoleador.tsx` (lectura, equipos planos, jugadores planos, guardado)
 - [ ] 5. Actualizar `Mis16.tsx` (solo cambiar path de sistema)
-- [ ] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile`
+- [ ] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile/data/data`
 - [ ] 7. Actualizar `Home.tsx` — cambiar paths de `system/radar_match` y `system/colombia_match`
 - [ ] 8. `npm run build` — sin errores
 - [ ] 9. Probar todas las funcionalidades en `npm run dev`

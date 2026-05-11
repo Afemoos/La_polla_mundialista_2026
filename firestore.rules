@@ -149,7 +149,7 @@ service cloud.firestore {
       }
     }
     match /users/{innerUid} {
-      match /profile {
+      match /profile/{profileDoc} {
         allow read, update: if isAuthenticated() && (request.auth.uid == innerUid || isAdmin());
         allow create: if request.auth.uid == innerUid;
         allow delete: if isAdmin();

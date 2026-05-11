@@ -15,7 +15,7 @@ Nunca usar `deleteDoc()`. En su lugar, escribir `deletedAt: serverTimestamp()` e
 
 Los siguientes lugares deben inicializar `deletedAt: null` al crear documentos:
 
-**1. AuthContext.tsx** — al crear `users/{uid}/profile`:
+**1. AuthContext.tsx** — al crear `users/{uid}/profile/data/data`:
 ```typescript
 await setDoc(newProfileRef, {
     uid: user.uid,
