@@ -50,7 +50,7 @@ await setDoc(predictionDocRef, {
 
 Actualmente: `updateDoc(doc(db, 'users', currentUser!.uid), { tokens: increment(-match.tokenCost) })`
 
-Cambiar a: `updateDoc(doc(db, 'users', currentUser!.uid, 'profile'), { tokens: increment(-match.tokenCost) })`
+Cambiar a: `updateDoc(doc(db, 'users', currentUser!.uid, 'profile', 'data'), { tokens: increment(-match.tokenCost) })`
 
 **4. Modificación de predicción:**
 
@@ -145,7 +145,7 @@ await saveUserPick(currentUser.uid, 'world_cup_2026', 'campeon', {
   teamLogo: selectedTeam.logo,
 }, alreadyPaid ? undefined : { amount: 10 });
 if (!alreadyPaid) {
-  await updateDoc(doc(db, 'users', currentUser.uid, 'profile'), {
+  await updateDoc(doc(db, 'users', currentUser.uid, 'profile', 'data'), {
     paidFeatures: arrayUnion('campeon')
   });
 }
@@ -224,12 +224,12 @@ getDoc(doc(db, 'tournaments/world_cup_2026/system', 'round_of_32_matches'))
 
 Archivo: `src/components/Sidebar.tsx`
 
-El Sidebar debe leer tokens de `users/{uid}/profile/data/data` (nueva ruta). Este cambio se hace AQUÍ (junto con PollaMundialista) para mantener consistencia: ambos componentes leen y escriben tokens en la misma ruta.
+El Sidebar debe leer tokens de `users/{uid}/profile/data` (nueva ruta).
 
 ```typescript
 useEffect(() => {
     if (!authCounter?.currentUser) return;
-    const unsub = onSnapshot(doc(db, 'users', authCounter.currentUser.uid, 'profile'), (snap) => {
+    const unsub = onSnapshot(doc(db, 'users', authCounter.currentUser.uid, 'profile', 'data'), (snap) => {
         if (snap.exists()) {
             setTokens(snap.data().tokens || 0);
         }
@@ -278,7 +278,7 @@ Probar en `npm run dev`:
 - [ ] 3. Actualizar `MiCampeon.tsx` (lectura, equipos, guardado con paidFeatures)
 - [ ] 4. Actualizar `MiGoleador.tsx` (lectura, equipos planos, jugadores planos, guardado)
 - [ ] 5. Actualizar `Mis16.tsx` (solo cambiar path de sistema)
-- [ ] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile/data/data`
+- [ ] 6. Actualizar `Sidebar.tsx` — leer tokens de `users/{uid}/profile/data`
 - [ ] 7. Actualizar `Home.tsx` — cambiar paths de `system/radar_match` y `system/colombia_match`
 - [ ] 8. `npm run build` — sin errores
 - [ ] 9. Probar todas las funcionalidades en `npm run dev`

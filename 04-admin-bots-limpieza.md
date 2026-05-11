@@ -53,8 +53,8 @@ const snap = await getDocs(q);
 Actualizar para usar las nuevas rutas:
 - Eliminar predicciones de `users/{uid}/tournaments/*/predictions/` (collectionGroup delete)
 - Eliminar brackets/campeón/goleador de `users/{uid}/tournaments/*/`
-- Resetear tokens en `users/{uid}/profile/data/data`
-- Eliminar duplicados en `users/{uid}/profile/data/data`
+- Resetear tokens en `users/{uid}/profile/data`
+- Eliminar duplicados en `users/{uid}/profile/data`
 
 **5. Importar `collectionGroup`:**
 ```typescript
@@ -97,7 +97,7 @@ def delete_collection(coll_ref, batch_size=500):
 
 ### Paso 4: Simplificar firestore.rules
 
-Eliminar las reglas antiguas del archivo `firestore.rules`. Solo deben quedar las reglas nuevas de `tournaments/` y `users/{uid}/profile/data/data`. Desplegar:
+Eliminar las reglas antiguas del archivo `firestore.rules`. Solo deben quedar las reglas nuevas de `tournaments/` y `users/{uid}/profile/data`. Desplegar:
 
 ```bash
 npx firebase deploy --only firestore:rules
@@ -163,7 +163,7 @@ docs = db.collection_group("predictions").stream()
 
 ### Admin
 - [ ] 1. Migrar lectura de usuarios a `collectionGroup('profile')`
-- [ ] 2. Migrar add/remove tokens a `users/{uid}/profile/data/data`
+- [ ] 2. Migrar add/remove tokens a `users/{uid}/profile/data`
 - [ ] 3. Migrar vista de predicciones (leer de `users/{selectedUserId}/tournaments/.../predictions/`)
 - [ ] 4. Actualizar formateo de fábrica para nuevas rutas
 - [ ] 5. `npm run build`
