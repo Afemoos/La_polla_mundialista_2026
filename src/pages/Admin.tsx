@@ -53,7 +53,7 @@ export default function Admin() {
     }, []);
 
     useEffect(() => {
-        const unsubApi = onSnapshot(doc(db, 'system', 'api_status'), (snap) => {
+        const unsubApi = onSnapshot(doc(db, 'tournaments/world_cup_2026/system', 'api_status'), (snap) => {
             if (snap.exists()) {
                 setApiStatus(snap.data() as any);
             }

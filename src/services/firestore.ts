@@ -12,14 +12,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { RadarMatch, WorldCupTeam, Player, UserProfile, PredictionV2, BracketV2, CampeonPick, GoleadorPick } from '../types/firestore';
-
-export async function saveRadarMatch(match: RadarMatch) {
-  await setDoc(doc(db, 'system', 'radar_match'), {
-    ...match,
-    updatedAt: serverTimestamp(),
-  });
-}
+import type { WorldCupTeam, Player, UserProfile, PredictionV2, BracketV2, CampeonPick, GoleadorPick } from '../types/firestore';
 
 // AI-NOTE: Cache de equipos a nivel de módulo para evitar 12 lecturas en cada navegación
 

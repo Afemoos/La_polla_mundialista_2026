@@ -104,7 +104,7 @@ export default function Resultados() {
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(doc(db, 'system', 'recent_results'), (snap) => {
+        const unsubscribe = onSnapshot(doc(db, 'tournaments/world_cup_2026/system', 'recent_results'), (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
                 setColombiaMatches(data.colombia || []);
