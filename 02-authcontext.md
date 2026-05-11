@@ -108,6 +108,6 @@ Debe compilar sin errores. El AuthContext ahora crea `users/{uid}/profile` autom
 
 ## To-Do List
 
-- [ ] 1. Actualizar `AuthContext.tsx`: migrar creación/lectura de `users/{uid}` a `users/{uid}/profile` con soporte para datos antiguos
-- [ ] 2. `npm run build` — sin errores
-- [ ] 3. Probar login con cuenta existente y nueva en local
+- [x] 1. Actualizar `AuthContext.tsx`: migrar creación/lectura de `users/{uid}` a `users/{uid}/profile` con soporte para datos antiguos
+- [x] 2. `npm run build` — sin errores
+- [x] 3. Probar login con cuenta existente y nueva en local

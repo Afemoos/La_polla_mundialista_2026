@@ -6,7 +6,7 @@ import {
     signOut, 
     onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 
 interface AuthContextType {
@@ -36,22 +36,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setCurrentUser(user);
             if(user && user.email) {
                 setIsAdmin(ADMIN_EMAILS.includes(user.email));
-                // AI-NOTE: Registrar automáticamente al usuario en Firestore si es su primer login
-                const userDocRef = doc(db, 'users', user.uid);
-                const userSnap = await getDoc(userDocRef);
-                if (!userSnap.exists()) {
-                    await setDoc(userDocRef, {
-                        uid: user.uid,
-                        email: user.email,
-                        tokens: 0
-                    });
+                // AI-NOTE: Migración a nueva estructura. Intentar leer de la nueva ruta primero.
+                const newProfileRef = doc(db, 'users', user.uid, 'profile');
+                const newProfileSnap = await getDoc(newProfileRef);
+                
+                if (!newProfileSnap.exists()) {
+                    // Verificar si existe en la ruta antigua (para migrar)
+                    const oldUserRef = doc(db, 'users', user.uid);
+                    const oldUserSnap = await getDoc(oldUserRef);
+                    
+                    if (oldUserSnap.exists()) {
+                        // Migrar: copiar datos antiguos a la nueva ruta
+                        const oldData = oldUserSnap.data();
+                        await setDoc(newProfileRef, {
+                            uid: user.uid,
+                            email: user.email,
+                            tokens: oldData.tokens || 0,
+                            paidFeatures: [],
+                            createdAt: oldData.createdAt || serverTimestamp(),
+                            updatedAt: serverTimestamp(),
+                        });
+                    } else {
+                        // Usuario completamente nuevo
+                        await setDoc(newProfileRef, {
+                            uid: user.uid,
+                            email: user.email,
+                            tokens: 0,
+                            paidFeatures: [],
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp(),
+                        });
+                    }
                 }
             } else {
                 setIsAdmin(false);
             }
             setLoading(false);
         });
-
         return unsubscribe;
     }, []);
 
