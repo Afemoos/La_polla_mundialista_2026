@@ -94,6 +94,7 @@ function MatchCard({
       // AI-NOTE: ID compuesto uid_matchId previene duplicados
       const predictionDocRef = doc(db, `users/${currentUser!.uid}/tournaments/world_cup_2026/predictions`, match.id);
       await setDoc(predictionDocRef, {
+        email: currentUser?.email || '',
         matchId: match.id,
         matchDetails: `${match.homeTeam} vs ${match.awayTeam}`,
         homeScore: Number(homeScore),

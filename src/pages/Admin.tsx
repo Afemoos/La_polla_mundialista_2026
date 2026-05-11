@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { onSnapshot, doc, updateDoc, increment, setDoc, getDocs, getDoc, writeBatch, collectionGroup, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllPredictionsQuery } from '../services/firestore';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import type { Prediction, AppUser } from '../types/firestore';
 import { Wifi, Coins, Plus, Minus, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet, History } from 'lucide-react';
@@ -24,11 +23,23 @@ export default function Admin() {
     const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number; duplicatesRemoved: number } | null>(null);
 
     useEffect(() => {
-        const q = getAllPredictionsQuery();
+        const q = query(collectionGroup(db, 'predictions'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const betsArray: Prediction[] = [];
             querySnapshot.forEach((d) => {
-                betsArray.push({ id: d.id, ...d.data() } as Prediction);
+                const data = d.data();
+                betsArray.push({
+                    id: d.id,
+                    email: data.email || '',
+                    type: 'POLla_MUNDIALISTA',
+                    matchDetails: data.matchDetails || '',
+                    prediction: data.homeScore + ' - ' + (data.awayScore || ''),
+                    result: data.result,
+                    finalScore: data.finalScore,
+                    timestamp: data.createdAt,
+                    tokenCost: data.tokenCost,
+                    lockedAt: data.lockedAt,
+                } as Prediction);
             });
             setAllBets(betsArray);
         });
