@@ -41,24 +41,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const newProfileSnap = await getDoc(newProfileRef);
                 
                 if (!newProfileSnap.exists()) {
-                    // Verificar si existe en la ruta antigua (para migrar)
-                    const oldUserRef = doc(db, 'users', user.uid);
-                    const oldUserSnap = await getDoc(oldUserRef);
-                    
-                    if (oldUserSnap.exists()) {
-                        // Migrar: copiar datos antiguos a la nueva ruta
-                        const oldData = oldUserSnap.data();
-                        await setDoc(newProfileRef, {
-                            uid: user.uid,
-                            email: user.email,
-                            tokens: oldData.tokens || 0,
-                            paidFeatures: [],
-                            deletedAt: null,
-                            createdAt: oldData.createdAt || serverTimestamp(),
-                            updatedAt: serverTimestamp(),
-                        });
-                    } else {
-                        // Usuario completamente nuevo
+                    // AI-NOTE: Intentar migrar datos antiguos. La ruta users/{uid} ya no tiene reglas
+                    // de lectura en firestore.rules, por lo que getDoc puede lanzar permission-denied.
+                    // Envolvemos en try/catch para que usuarios nuevos no se queden en pantalla en blanco.
+                    try {
+                        const oldUserRef = doc(db, 'users', user.uid);
+                        const oldUserSnap = await getDoc(oldUserRef);
+                        
+                        if (oldUserSnap.exists()) {
+                            const oldData = oldUserSnap.data();
+                            await setDoc(newProfileRef, {
+                                uid: user.uid,
+                                email: user.email,
+                                tokens: oldData.tokens || 0,
+                                paidFeatures: [],
+                                deletedAt: null,
+                                createdAt: oldData.createdAt || serverTimestamp(),
+                                updatedAt: serverTimestamp(),
+                            });
+                        } else {
+                            // Usuario completamente nuevo
+                            await setDoc(newProfileRef, {
+                                uid: user.uid,
+                                email: user.email,
+                                tokens: 0,
+                                paidFeatures: [],
+                                deletedAt: null,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp(),
+                            });
+                        }
+                    } catch {
+                        // AI-NOTE: Si falla la lectura de la ruta antigua (ej. permission-denied),
+                        // crear perfil nuevo directamente. La migración de datos antiguos ya no es necesaria
+                        // porque la fase de limpieza eliminó las colecciones antiguas.
                         await setDoc(newProfileRef, {
                             uid: user.uid,
                             email: user.email,

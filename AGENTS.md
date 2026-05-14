@@ -2,9 +2,10 @@
 
 ## Comandos
 
-- **dev:** `npm run dev`
-- **build (obligatorio antes de commit):** `npm run build` — ejecuta `tsc -b && vite build`. El build debe pasar limpio; si falla, el push rompe Vercel.
-- **lint:** `npm run lint`
+- **install:** `corepack pnpm install` — usa pnpm. **`npm install` queda ESTRICTAMENTE PROHIBIDO.**
+- **dev:** `corepack pnpm dev`
+- **build (obligatorio antes de commit):** `corepack pnpm build` — ejecuta `tsc -b && vite build`. El build debe pasar limpio; si falla, el push rompe Vercel.
+- **lint:** `corepack pnpm lint`
 - **deploy de reglas Firestore:** `npx firebase deploy --only firestore:rules`
 
 ## Arquitectura
