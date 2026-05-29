@@ -27,6 +27,29 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isAdmin();
       }
+      match /fixtures/{fixtureId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+      match /active_cards/{cardId} {
+        allow read: if isAuthenticated();
+        allow create: if isAdmin() && request.resource.data.fixtureStatus == 'NS';
+        allow update: if isAdmin() &&
+          (!('fixtureId' in request.resource.data) || request.resource.data.fixtureId == resource.data.fixtureId) &&
+          (!('homeTeamApiId' in request.resource.data) || request.resource.data.homeTeamApiId == resource.data.homeTeamApiId) &&
+          (!('awayTeamApiId' in request.resource.data) || request.resource.data.awayTeamApiId == resource.data.awayTeamApiId) &&
+          (!('homeTeamName' in request.resource.data) || request.resource.data.homeTeamName == resource.data.homeTeamName) &&
+          (!('awayTeamName' in request.resource.data) || request.resource.data.awayTeamName == resource.data.awayTeamName) &&
+          (!('date' in request.resource.data) || request.resource.data.date == resource.data.date) &&
+          (!('stadium' in request.resource.data) || request.resource.data.stadium == resource.data.stadium) &&
+          (!('involvesColombia' in request.resource.data) || request.resource.data.involvesColombia == resource.data.involvesColombia) &&
+          request.resource.data.fixtureStatus == resource.data.fixtureStatus;
+        allow delete: if isAdmin();
+      }
+      match /flat_teams/{teamApiId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
     }
     match /users/{uid} {
       match /profile/{profileDoc} {

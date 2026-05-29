@@ -1,0 +1,48 @@
+name: Sync Fixtures
+
+on:
+  workflow_dispatch:
+    inputs:
+      tournament:
+        description: 'Torneo a sincronizar'
+        required: true
+        type: choice
+        options:
+          - world_cup_2026
+          - champions_league_2025
+
+jobs:
+  sync_fixtures:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r legacy_python/requirements_bot.txt
+
+      - name: Determinar league y season
+        id: params
+        run: |
+          if [ "${{ inputs.tournament }}" = "world_cup_2026" ]; then
+            echo "league=1" >> $GITHUB_OUTPUT
+            echo "season=2026" >> $GITHUB_OUTPUT
+          else
+            echo "league=2" >> $GITHUB_OUTPUT
+            echo "season=2025" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sincronizar fixtures
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: |
+          python legacy_python/sync_tournament_fixtures.py --league ${{ steps.params.outputs.league }} --season ${{ steps.params.outputs.season }}

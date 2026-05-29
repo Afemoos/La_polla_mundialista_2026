@@ -152,123 +152,116 @@ def get_team_logo(team_name, cache):
     cache[team_name] = (None, "")
     return (None, "")
 
-def fetch_worldcup_path(db):
-    """Construye la ruta de 13 partidos del Mundial 2026 para system/worldcup_path.
-    Intenta obtener datos de API-Football (fixtures). Si no existen aún, usa fechas
-    manuales y busca logos vía la API de Teams o diccionario de IDs conocidos."""
-    print("\n--- Construyendo ruta mundialista (13 partidos) ---")
+def get_all_active_cards(db):
+    active_cards = []
+    tournament_ids = ["world_cup_2026", "champions_league_2025"]
+    for tid in tournament_ids:
+        try:
+            snap = db.collection(f"tournaments/{tid}/active_cards").where("isActive", "==", True).get()
+            for doc in snap:
+                data = doc.to_dict()
+                data["_cardId"] = doc.id
+                data["_tournamentId"] = tid
+                active_cards.append(data)
+        except Exception as e:
+            print(f"Error leyendo active_cards de {tid}: {e}")
+    return active_cards
 
-    # Los 13 partidos objetivo con fechas exactas y costo en tokens
-    TARGET_MATCHES = [
-        ("wc-01", "México", "Sudáfrica", "2026-06-11T17:00:00-05:00", 3, "Estadio Azteca (Ciudad de México)"),
-        ("wc-02", "Brasil", "Marruecos", "2026-06-13T17:00:00-05:00", 3, "MetLife Stadium (Nueva Jersey)"),
-        ("wc-03", "Países Bajos", "Japón", "2026-06-14T17:00:00-05:00", 3, "AT&T Stadium (Arlington/Dallas)"),
-        ("wc-04", "Inglaterra", "Croacia", "2026-06-17T17:00:00-05:00", 3, "AT&T Stadium (Arlington/Dallas)"),
-        ("wc-05", "Colombia", "Uzbekistán", "2026-06-17T22:00:00-05:00", 5, "Estadio Azteca (Ciudad de México)"),
-        ("wc-06", "Argentina", "Austria", "2026-06-22T17:00:00-05:00", 3, "AT&T Stadium (Texas)"),
-        ("wc-07", "Portugal", "Uzbekistán", "2026-06-23T17:00:00-05:00", 3, "NRG Stadium (Houston)"),
-        ("wc-08", "Colombia", "RD Congo", "2026-06-23T22:00:00-05:00", 5, "Estadio Akron (Guadalajara)"),
-        ("wc-09", "Escocia", "Brasil", "2026-06-24T17:00:00-05:00", 3, "Hard Rock Stadium (Miami)"),
-        ("wc-10", "Ecuador", "Alemania", "2026-06-25T17:00:00-05:00", 3, "MetLife Stadium (Nueva Jersey)"),
-        ("wc-11", "Noruega", "Francia", "2026-06-26T17:00:00-05:00", 3, "Gillette Stadium (Foxborough/Boston)"),
-        ("wc-12", "Uruguay", "España", "2026-06-26T22:00:00-05:00", 3, "Estadio Akron (Guadalajara)"),
-        ("wc-13", "Colombia", "Portugal", "2026-06-27T19:30:00-05:00", 5, "Hard Rock Stadium (Miami)"),
-    ]
 
-    # Intentar obtener fixtures reales del Mundial 2026
-    api_fixtures = {}
-    print("  Consultando fixtures del Mundial 2026 en API-Football...")
-    url = "https://v3.football.api-sports.io/fixtures?league=1&season=2026"
-    time.sleep(0.5)
-    response = requests.get(url, headers=HEADERS)
+def update_active_card_probabilities(db, active_cards):
+    print(f"\n--- Actualizando {len(active_cards)} active_cards ---")
+    for card in active_cards:
+        fixture_id = card.get("fixtureId")
+        if not fixture_id:
+            continue
+        tournament_id = card.get("_tournamentId")
+        card_id = card.get("_cardId")
+        h, d, a = fetch_predictions(fixture_id, db)
+        if h is not None or d is not None or a is not None:
+            updates = {"updatedAt": firestore.SERVER_TIMESTAMP}
+            if h is not None:
+                updates["probHome"] = h
+            if d is not None:
+                updates["probDraw"] = d
+            if a is not None:
+                updates["probAway"] = a
+            try:
+                doc_path = f"tournaments/{tournament_id}/active_cards/{card_id}"
+                db.document(doc_path).update(updates)
+                print(f"  Actualizado card {card_id}: probs {h}/{d}/{a}")
+            except Exception as e:
+                print(f"  Error actualizando card {card_id}: {e}")
 
-    if db:
-        update_api_status(db, response.headers)
 
-    if response.status_code == 200:
-        data = response.json()
-        fixtures = data.get("response", [])
-        if not data.get("errors") and fixtures:
-            print(f"  API retornó {len(fixtures)} partidos del Mundial 2026.")
-            for f in fixtures:
-                home = f["teams"]["home"]["name"]
-                away = f["teams"]["away"]["name"]
-                key = (home, away)
-                api_fixtures[key] = f
-        elif data.get("errors"):
-            print(f"  API reportó: {data['errors']}")
-    else:
-        print(f"  API no disponible. Se usarán datos manuales.")
+def sync_and_deactivate_active_cards(db):
+    print("\n--- Sincronizando estado de fixtures y auto-desactivando ---")
+    active_cards = get_all_active_cards(db)
+    if not active_cards:
+        print("  No hay active_cards para procesar.")
+        return
 
-    logo_cache = {}
-    matches = []
+    updated_count = 0
+    deactivated_count = 0
 
-    for match_id, home_name, away_name, date_str, token_cost, stadium_name in TARGET_MATCHES:
-        key = (home_name, away_name)
-        fixture = api_fixtures.get(key)
-        
-        # AI-NOTE: Prioridad de probabilidades:
-        # 1. API-Football predictions (datos reales cuando estén disponibles)
-        # 2. FIFA-based precalculadas (ranking FIFA abril 2025)
-        # 3. Genéricas 33/33/34 (último recurso)
-        fifa_probs = FIFA_BASED_PROBS.get((home_name, away_name))
-        default_h, default_d, default_a = fifa_probs if fifa_probs else (33, 33, 34)
+    for card in active_cards:
+        fixture_id = card.get("fixtureId")
+        if not fixture_id:
+            continue
+        tournament_id = card.get("_tournamentId")
+        card_id = card.get("_cardId")
+        current_status = card.get("fixtureStatus")
+        card_is_active = card.get("isActive", True)
 
-        if fixture:
-            # API encontró el partido -> intentar obtener predicciones reales
-            h, d, a = fetch_predictions(fixture["fixture"]["id"], db)
-            if h is None:
-                # API no tiene predicciones aún -> usar FIFA-based
-                h, d, a = default_h, default_d, default_a
-                print(f"  ✅ {match_id}: {home_name} vs {away_name} (API fixture + FIFA probs)")
-            else:
-                print(f"  ✅ {match_id}: {home_name} vs {away_name} (API fixture + API probs)")
-            match_obj = {
-                "id": match_id,
-                "fixtureId": fixture["fixture"]["id"],
-                "homeTeam": fixture["teams"]["home"]["name"],
-                "awayTeam": fixture["teams"]["away"]["name"],
-                "homeFlag": fixture["teams"]["home"]["logo"],
-                "awayFlag": fixture["teams"]["away"]["logo"],
-                "stadium": fixture["fixture"]["venue"]["name"] or stadium_name,
-                "date": fixture["fixture"]["date"],
-                "probHome": h,
-                "probDraw": d,
-                "probAway": a,
-                "tokenCost": token_cost,
-                "isDefined": True
-            }
-        else:
-            # API no tiene el partido -> datos manuales + FIFA probs
-            _, home_logo = get_team_logo(home_name, logo_cache)
-            _, away_logo = get_team_logo(away_name, logo_cache)
-            match_obj = {
-                "id": match_id,
-                "fixtureId": None,
-                "homeTeam": home_name,
-                "awayTeam": away_name,
-                "homeFlag": home_logo,
-                "awayFlag": away_logo,
-                "stadium": stadium_name,
-                "date": date_str,
-                "probHome": default_h,
-                "probDraw": default_d,
-                "probAway": default_a,
-                "tokenCost": token_cost,
-                "isDefined": True
-            }
-            print(f"  ⚠️  {match_id}: {home_name} vs {away_name} (manual + FIFA probs)")
+        if current_status in ("LIVE", "FT", "AET", "PEN"):
+            continue
 
-        matches.append(match_obj)
+        url = f"https://v3.football.api-sports.io/fixtures?id={fixture_id}"
+        time.sleep(0.5)
+        try:
+            response = requests.get(url, headers=HEADERS)
+            if response.status_code != 200:
+                continue
+            data = response.json()
+            fixtures = data.get("response", [])
+            if not fixtures:
+                continue
+            fixture = fixtures[0]
+            api_status = fixture.get("fixture", {}).get("status", "NS")
+            venue = fixture.get("fixture", {}).get("venue", {}) or {}
+            new_stadium = venue.get("name") or card.get("stadium")
+            new_venue_city = venue.get("city") or card.get("venueCity")
+            new_date = fixture.get("fixture", {}).get("date") or card.get("date")
 
-    try:
-        db.collection("tournaments/world_cup_2026/system").document("worldcup_path").set({
-            "matches": matches,
-            "updatedAt": firestore.SERVER_TIMESTAMP
-        })
-        print(f"  ✅ system/worldcup_path actualizado con {len(matches)} partidos.")
-    except Exception as e:
-        print(f"  ❌ Error guardando worldcup_path: {e}")
+            updates = {"updatedAt": firestore.SERVER_TIMESTAMP}
+            changed = False
+
+            if api_status != "NS" and api_status != current_status:
+                updates["fixtureStatus"] = api_status
+                updates["isActive"] = False
+                deactivated_count += 1
+                print(f"  Auto-desactivando card {card_id} (estado: {current_status} -> {api_status})")
+                changed = True
+
+            if new_stadium and new_stadium != card.get("stadium"):
+                updates["stadium"] = new_stadium
+                changed = True
+            if new_venue_city and new_venue_city != card.get("venueCity"):
+                updates["venueCity"] = new_venue_city
+                changed = True
+            if new_date and new_date != card.get("date"):
+                updates["date"] = new_date
+                changed = True
+
+            if changed:
+                doc_path = f"tournaments/{tournament_id}/active_cards/{card_id}"
+                db.document(doc_path).update(updates)
+                updated_count += 1
+
+        except Exception as e:
+            print(f"  Error sincronizando card {card_id}: {e}")
+            continue
+
+    print(f"  {updated_count} cards actualizadas, {deactivated_count} auto-desactivadas.")
 
 def main():
     print("Iniciando búsqueda de próximos partidos...")
@@ -359,11 +352,14 @@ def main():
             print("Actualizando el documento system/colombia_match...")
             radar_match_colombia["updatedAt"] = firestore.SERVER_TIMESTAMP
             db.collection("tournaments/world_cup_2026/system").document("colombia_match").set(radar_match_colombia)
-        
-        # AI-NOTE: Actualizar ruta mundialista (system/worldcup_path)
-        fetch_worldcup_path(db)
 
-        print("✅ ¡Todos los radares y ruta mundialista actualizados exitosamente en Firebase!")
+        # --- 4. Actualizar active_cards ---
+        sync_and_deactivate_active_cards(db)
+        active_cards = get_all_active_cards(db)
+        if active_cards:
+            update_active_card_probabilities(db, active_cards)
+
+        print("✅ Radares y active_cards actualizados exitosamente en Firebase!")
 
     except Exception as e:
         import traceback

@@ -11,6 +11,8 @@ import Mis16 from './pages/Mis16';
 import MiCampeon from './pages/MiCampeon';
 import MiGoleador from './pages/MiGoleador';
 import Champions from './pages/Champions';
+import AdminFab from './components/AdminFab';
+import AdminCreateCardModal from './components/AdminCreateCardModal';
 import { useAuth } from './contexts/AuthContext';
 import { Menu } from 'lucide-react';
 import './index.css';
@@ -18,6 +20,7 @@ import './index.css';
 function App() {
   const authContext = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
 
   if (!authContext?.currentUser) {
     return (
@@ -69,6 +72,14 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
+        {authContext.isAdmin && (
+          <>
+            <AdminFab onClick={() => setIsCardModalOpen(true)} />
+            {isCardModalOpen && (
+              <AdminCreateCardModal onClose={() => setIsCardModalOpen(false)} />
+            )}
+          </>
+        )}
       </div>
     </BrowserRouter>
   );

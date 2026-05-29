@@ -1,443 +1,742 @@
-# Plan de Implementación: Bracket "Mis 16", "Mi Campeón", "Mi Goleador" y Reorganización de Navegación
+# Plan de Implementación: Creación Dinámica de Tarjetas de Partidos para Admin
 
 ## 1. Contexto y Objetivos
 
-Ampliar la sección "Polla Mundialista" con tres nuevas funcionalidades de predicción para el Mundial 2026, reorganizar la navegación y sentar las bases para la Champions League.
+El admin necesita poder crear nuevas tarjetas de partidos tanto en "Mi Polla" (ruta colombina) como en "Champions" sin depender de llamadas a la API en cada interacción del usuario.
 
-- **Mis 16:** Bracket interactivo donde cada usuario predice los 32 partidos desde dieciseisavos hasta la final. Los equipos de dieciseisavos vienen de la API; los de rondas posteriores se derivan automáticamente de las predicciones del usuario en rondas anteriores.
-- **Mi Campeón:** Dropdown simple para que el usuario seleccione el campeón del torneo (de entre los 48 equipos ya almacenados en Firestore).
-- **Mi Goleador:** Búsqueda con autocompletado para seleccionar el goleador del torneo (de entre los 1616 jugadores ya almacenados en Firestore).
-- **Mi Polla:** El contenido actual de `/polla-mundialista` se reubica aquí como subpágina.
-- **Champions:** Página vacía (placeholder) debajo de "Polla Mundialista" en el sidebar.
+**Problema actual:**
+- `worldcup_path` tiene 13 partidos predefinidos y estáticos.
+- Los 48 equipos están almacenados en Firestore, pero no hay información de qué equipo juega contra cuál.
+- No se puede construir un dropdown de "oponentes disponibles" sin esa información.
 
-## 2. Arquitectura de Base de Datos (Firestore)
+**Objetivo:**
+- Pre-poblar Firestore con TODOS los fixtures de cada torneo (World Cup, Champions) desde la API-Football.
+- El admin selecciona Equipo 1 → el sistema muestra solo los equipos que enfrentarán a Equipo 1 (obtenido de Firestore, no de la API).
+- Después de elegir ambos equipos, el sistema conoce stadium, date, probabilities, etc.
+- Un botón de "Sincronizar fixtures" permite al admin populate Firestore con todos los partidos de un torneo bajo demanda.
+- **No hay cron automático.** La sincronización es manual: una vez antes del torneo para fase de grupos, y otra vez después de que terminen los grupos para traer los partidos de knockout.
 
-### 2.1. Evaluación de la propuesta original
+---
 
-Propuesta del usuario: `/predictions/mis_16/users/{userId}`
+## 2. Estrategia de Ejecución
 
-**Análisis:** La colección `predictions` ya existe con un esquema específico (`email`, `type`, `matchDetails`, `prediction`, `result`, etc.) para apuestas individuales. Mezclar el bracket (un documento único por usuario con 32 partidos) en esta colección crea confusión de esquemas. Las reglas de Firestore actuales para `predictions` validan campos que el bracket no tendrá.
+### 2.1. Sub-agentes y paralelismo
 
-**Alternativa recomendada:** Colección independiente `/brackets/{userId}` con un solo documento por usuario que contenga:
-- Los 32 partidos del bracket
-- La selección de campeón
-- La selección de goleador
+El plan se ejecuta con **6 sub-agentes** en 4 tandas:
 
-Esto simplifica reglas de Firestore, evita conflictos de esquema, y permite una sola lectura para obtener toda la predicción del torneo del usuario.
+**Tanda 1 (paralela) — Backend + Tipos:**
 
-### 2.2. Nueva colección: `brackets`
+| Sub-agente | Alcance | Tareas | Archivos |
+|-----------|---------|--------|----------|
+| **A — Backend Python** | Script de sync, modificar fetch_matches, workflow | 1, 6, 6b, 19 | `sync_tournament_fixtures.py`, `fetch_matches.py`, `sync_fixtures.yml` |
+| **B — Tipos + DB** | Interfaces, reglas, índices, constantes | 2, 3, 4, 7 | `firestore.ts`, `firestore.rules`, `firestore.indexes.json`, `tournaments.ts` |
 
-**Ruta:** `/brackets/{userId}` — un documento por usuario.
+**Tanda 2 (paralela, depende de B) — Frontend Core:**
+
+| Sub-agente | Alcance | Tareas | Archivos |
+|-----------|---------|--------|----------|
+| **C — Componentes Admin** | FAB + Modal | 8, 9 | `AdminFab.tsx`, `AdminCreateCardModal.tsx` |
+| **D — Funciones Firestore** | Nuevas funciones helper | 10, 11, 12, 13, 14 | `firestore.ts` |
+
+**Tanda 3 (depende de C + D) — Integración:**
+
+| Sub-agente | Alcance | Tareas | Archivos |
+|-----------|---------|--------|----------|
+| **E — Páginas** | PollaMundialista, Champions, Admin, deprecación | 15, 16, 17, 19b, 20 | `PollaMundialista.tsx`, `Champions.tsx`, `Admin.tsx` |
+
+**Tanda 4 (final) — Deploy + Verificación:**
+
+| Sub-agente | Alcance | Tareas | Archivos |
+|-----------|---------|--------|----------|
+| **F — Deploy + Build** | Índices, build, pruebas | 5, 21, 22, 23 | `tsc`, `vite build`, `firebase deploy` |
+
+### 2.2. Dependencias
+
+```
+Tanda 1   A (Python) ⚡ B (Tipos)   ← paralelo
+              │            │
+              ↓            ↓
+Tanda 2   C (Comps)  ⚡ D (Funcs)   ← paralelo, ambas dependen de B
+              │            │
+              └─────┬──────┘
+                    ↓
+Tanda 3        E (Páginas)          ← depende de C + D
+                    │
+                    ↓
+Tanda 4        F (Deploy)           ← depende de todo
+```
+
+### 2.3. Instrucciones para el agente ejecutor
+
+- **No modificar `auditor.py`, `fetch_results.py` ni `Home.tsx`.**
+- **`firestore.indexes.json` se edita incrementalmente** al archivo existente.
+- **Marcar `[x]`** cada tarea en la To-Do List (sección 7) al completarla.
+- **Ejecutar `tsc -b` después de cada tanda** para detectar errores temprano.
+
+---
+
+## 3. Arquitectura de Base de Datos (Firestore)
+
+### 3.1. Nueva colección: `tournaments/{tournamentId}/fixtures/{fixtureId}`
+
+**Ruta:** `tournaments/world_cup_2026/fixtures/{fixtureId}` y `tournaments/champions_league_2025/fixtures/{fixtureId}`
+
+**Por qué subcolección bajo `tournaments/`:**
+- Aprovecha la estructura existente `tournaments/world_cup_2026/` (equipos, sistema).
+- Mantiene todo relacionado con un torneo bajo el mismo documento padre.
+- Path con 4 segmentos (par): `tournaments/world_cup_2026/fixtures/123` = 4 segmentos ✅
 
 **Estructura del documento:**
 
 ```typescript
-interface BracketMatch {
-  matchNumber: number;           // 1-32
-  round: 'dieciseisavos' | 'octavos' | 'cuartos' | 'semifinal' | 'tercer_lugar' | 'final';
-  homeTeam: { apiId: number; name: string; code: string; logo: string; } | null;
-  awayTeam: { apiId: number; name: string; code: string; logo: string; } | null;
-  homeScore: number | null;      // null = no ingresado aún
-  awayScore: number | null;      // null = no ingresado aún
-  winner: 'home' | 'away' | null; // equipo que avanza (checkbox). null = no seleccionado
-}
+interface TournamentFixture {
+  fixtureId: number;           // ID de API-Football (único por partido)
+  leagueId: number;             // 1 = World Cup, 2 = Champions
+  leagueName: string;          // "World Cup 2026", "Champions League"
+  season: number;              // 2026, 2025
+  tournamentId: string;        // "world_cup_2026", "champions_league_2025"
 
-interface Bracket {
-  userId: string;
-  email: string;
-  matches: BracketMatch[];        // 32 elementos (match-1 a match-32)
-  campeon: { apiId: number; name: string; code: string; logo: string; } | null;
-  goleador: { apiId: number; name: string; teamName: string; photo: string; } | null;
-  tokensSpent: {
-    bracket: number;               // 15 o 0
-    campeon: number;               // 10 o 0
-    goleador: number;              // 10 o 0
+  homeTeam: {
+    apiId: number;
+    name: string;
+    code: string;
+    logo: string;
   };
-  score: number | null;            // puntaje total calculado por el bot (fase futura)
-  campeonResult: 'GANADA' | 'PERDIDA' | null;   // asignado por bot al final del torneo
-  goleadorResult: 'GANADA' | 'PERDIDA' | null;   // asignado por bot al final del torneo
+  awayTeam: {
+    apiId: number;
+    name: string;
+    code: string;
+    logo: string;
+  };
+
+  date: string;                // ISO timestamp
+  stadium: string;              // nombre del estadio
+  venueCity: string;             // ciudad de la sede
+  status: 'NS' | 'LIVE' | 'FT' | 'AET' | 'PEN' | null;  // null = datos no disponibles aún
+
+  // Probabilidades (se actualizan cuando la API las provee)
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
 
-**Distribución de rounds en los 32 matches:**
+### 3.2. Nueva colección: `tournaments/{tournamentId}/active_cards`
 
-| Match # | Ronda |
-|---------|-------|
-| 1-16 | dieciseisavos (Round of 32) |
-| 17-24 | octavos (Round of 16) |
-| 25-28 | cuartos (Quarterfinals) |
-| 29-30 | semifinal (Semifinals) |
-| 31 | tercer_lugar (Third place) |
-| 32 | final (Final) |
+**Ruta:** `tournaments/world_cup_2026/active_cards/{cardId}`
 
-**Regla de propagación automática (crucial):** El ganador de match-1 y match-2 se convierten en `homeTeam` y `awayTeam` de match-17. El ganador de match-3 y match-4 → match-18, etc. Esto se calcula automáticamente en el frontend, NO en Firestore (para que siempre sea consistente con las selecciones del usuario).
-
-### 2.3. Cambios en `firestore.rules`
-
-Agregar al final del archivo (antes del cierre final `}`):
-
-```
-match /brackets/{userId} {
-  allow read: if isAuthenticated();
-  allow create: if isAuthenticated() && request.auth.uid == userId &&
-    request.resource.data.userId == userId &&
-    request.resource.data.email == request.auth.token.email &&
-    (!('score' in request.resource.data) || request.resource.data.score == null) &&
-    (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == null) &&
-    (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == null);
-  allow update: if isAuthenticated() && request.auth.uid == userId &&
-    request.resource.data.userId == userId &&
-    (!('score' in request.resource.data) || request.resource.data.score == resource.data.score) &&
-    (!('campeonResult' in request.resource.data) || request.resource.data.campeonResult == resource.data.campeonResult) &&
-    (!('goleadorResult' in request.resource.data) || request.resource.data.goleadorResult == resource.data.goleadorResult);
-  allow delete: if isAdmin();
-}
-
-match /players/{tournament}/{playerId} {
-  allow read: if isAuthenticated();
-  allow create, update, delete: if isAdmin();
-}
-```
-
-### 2.4. Cambios en `src/types/firestore.ts`
-
-Agregar las interfaces `BracketMatch` y `Bracket` descritas en 2.2.
-
-### 2.5. Cambios en `src/services/firestore.ts`
-
-Agregar funciones helper:
+**Motivo:** No todos los fixtures son "apostables". El admin decide qué tarjetas activar para que los usuarios puedan apostar.
 
 ```typescript
-// Obtiene el bracket del usuario. Retorna null si no existe.
-getUserBracket(userId: string): Promise<Bracket | null>
+interface ActiveCard {
+  cardId: string;              // ID único (UUID generado en frontend)
+  tournamentId: string;
+  fixtureId: number;           // referencia al fixture en fixtures/{fixtureId}
 
-// Guarda o actualiza campos parciales del bracket. Usa setDoc con merge: true para crear si no existe.
-// IMPORTANTE: La deducción de tokens y el guardado del bracket deben ser atómicos.
-// Usar writeBatch para hacer ambas operaciones en una sola transacción.
-saveUserBracket(userId: string, data: Partial<Bracket>, tokenDeduction?: { field: string, amount: number }): Promise<void>
-  // Si tokenDeduction está presente, ejecuta en batch:
-  //   1. updateDoc(doc(db, 'users', userId), { tokens: increment(-amount) })
-  //   2. setDoc(doc(db, 'brackets', userId), { ...data, tokensSpent: { [field]: amount } }, { merge: true })
-
-// Busca jugadores en la colección plana por nombre (para el combobox de MiGoleador).
-// Usa query con orderBy('name') y startAt/endAt para búsqueda eficiente. No carga los 1616 de una vez.
-searchPlayers(searchTerm: string, limit?: number): Promise<FlatPlayer[]>
-```
-
-### 2.6. Nueva colección plana de jugadores: `players`
-
-**Ruta:** `/players/world_cup_2026/{playerApiId}` — un documento por jugador.
-
-**Motivación:** Consultar 48 subcolecciones `Players` para el autocompletado de "Mi Goleador" sería muy lento (~48 lecturas). En su lugar, se crea una colección plana donde buscar jugadores requiere una sola query con `where('name', '>=', searchTerm)`.
-
-**Estructura del documento:**
-
-```typescript
-interface FlatPlayer {
-  apiId: number;
-  name: string;
-  age: number;
-  number: number | null;
-  position: string;
-  photo: string;
-  teamApiId: number;
-  teamName: string;
-  teamCode: string;
-  teamLogo: string;
-}
-```
-
-**Cambio requerido en `legacy_python/populate_teams.py`:** Agregar al final del loop de guardado de cada jugador una escritura adicional en la colección plana:
-
-```python
-db.document(f"players/world_cup_2026/{player_id}").set({
-    "apiId": player.get("id"),
-    "name": player.get("name"),
-    "age": player.get("age"),
-    "number": player.get("number"),
-    "position": player.get("position"),
-    "photo": player.get("photo"),
-    "teamApiId": team_api_id,
-    "teamName": team_data.get("name"),
-    "teamCode": team_data.get("code"),
-    "teamLogo": team_data.get("logo"),
-})
-```
-
-## 3. Backend / APIs
-
-### 3.1. Origen de datos para dieciseisavos
-
-Los 16 partidos de dieciseisavos serán proporcionados por API-Football cuando termine la fase de grupos. El endpoint:
-
-```
-GET https://v3.football.api-sports.io/fixtures?league=1&season=2026&round=Round of 32
-```
-
-Se guardará en `system/round_of_32_matches` (documento nuevo). Un futuro script de bot (similar a `fetch_matches.py`) lo poblará cuando los datos estén disponibles.
-
-**Comportamiento actual (fase de grupos, ~11-27 junio 2026):**
-- El documento `system/round_of_32_matches` NO existe o está vacío.
-- La página "Mis 16" debe detectar esta condición y mostrar un mensaje:
-  > "El torneo se encuentra en fase de grupos. La predicción de eliminación directa estará disponible cuando comiencen los dieciseisavos."
-- "Mi Campeón" y "Mi Goleador" sí están disponibles desde hoy (no dependen de partidos).
-
-**Comportamiento futuro (cuando termine la fase de grupos):**
-- El bot poblará `system/round_of_32_matches` con 16 partidos.
-- La página "Mis 16" detecta que el documento tiene datos y renderiza el bracket con los 16 partidos de dieciseisavos poblados.
-- El usuario puede empezar a llenar sus predicciones.
-
-**Lógica de detección en Mis16.tsx:**
-```typescript
-// Al cargar la página:
-const snapshot = await getDoc(doc(db, 'system', 'round_of_32_matches'));
-if (!snapshot.exists() || !snapshot.data().matches || snapshot.data().matches.length === 0) {
-  // Mostrar mensaje de "fase de grupos"
-} else {
-  // Renderizar bracket con los 16 partidos
-}
-```
-Esta verificación se hace cada vez que el usuario entra a la página, por lo que cuando el bot actualice el documento, el bracket aparecerá automáticamente sin necesidad de deploy.
-
-### 3.2. Nuevo documento del sistema: `system/round_of_32_matches`
-
-```typescript
-interface RoundOf32Match {
-  matchNumber: number;    // 1-16
-  homeTeam: { apiId: number; name: string; code: string; logo: string; };
-  awayTeam: { apiId: number; name: string; code: string; logo: string; };
+  // Datos del fixture copiados para lectura eficiente (desnormalización)
+  homeTeamApiId: number;
+  awayTeamApiId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamLogo: string;
+  awayTeamLogo: string;
   date: string;
   stadium: string;
+  tokenCost: number;
+
+  // Campos para queries eficientes sin necesidad de joins
+  involvesColombia: boolean;   // true si homeApiId === COLOMBIA_API_ID o awayApiId === COLOMBIA_API_ID
+
+  // Probabilidades (copiadas del fixture al crear, actualizadas por fetch_matches.py)
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+
+  isActive: boolean;           // false = ocultarla de usuarios
+  fixtureStatus: 'NS' | 'LIVE' | 'FT' | 'AET' | 'PEN' | null;  // copia del fixture al crear
+  createdAt: Timestamp;
+  createdBy: string;           // email del admin que creó la tarjeta
 }
 ```
 
-El script `fetch_matches.py` se extenderá en el futuro para poblar este documento. Para este plan, se crea la interfaz y la referencia en Firestore, pero el script no se modifica aún.
+**Nota:** `active_cards` es la colección que leen las páginas de "Mi Polla" y "Champions" para mostrar las tarjetas apostables. El script `fetch_matches.py` se modificará para escribir en `active_cards` en lugar de `worldcup_path`.
 
-### 3.3. Nuevo script: `legacy_python/fetch_bracket_matches.py`
+**Al crear una tarjeta,** los logos (`homeTeamLogo`, `awayTeamLogo`) se copian del fixture en ese momento (`fixture['teams']['home']['logo']`). Si los logos del fixture cambian en una futura sincronización, la tarjeta retiene los valores copiados. Esto es intencional para estabilidad de la UI.
 
-Se creará un script de bot (a futuro, no en este plan) que llame a la API y guarde los partidos de dieciseisavos en `system/round_of_32_matches`. El plan sienta las bases (interfaz, referencia, ruta de Firestore) para que este script se implemente cuando los datos estén disponibles.
+### 3.3. Cambios en `src/types/firestore.ts`
 
-## 4. Frontend: Rutas, Componentes y UI/UX
+Agregar interfaces:
+- `TournamentFixture`
+- `ActiveCard`
+- `ActiveCardInput` (para creación — ver abajo)
+- `FlatTeam` (para dropdown de equipos — ver sección 3.6)
+- `SyncStatus`
 
-### 4.1. Reorganización de rutas (App.tsx)
-
-Se usarán rutas anidadas de React Router. La ruta `/polla-mundialista` se convierte en un layout con subrutas:
-
-```
-/polla-mundialista
-  /mi-polla       → PollaMundialista.tsx (contenido actual renombrado)
-  /mis-16         → Mis16.tsx (nuevo: bracket)
-  /mi-campeon     → MiCampeon.tsx (nuevo: selección de campeón)
-  /mi-goleador    → MiGoleador.tsx (nuevo: selección de goleador)
-/champions        → Champions.tsx (placeholder vacío)
-```
-
-**Cambios en `App.tsx`:**
-
-1. Agregar imports de los nuevos componentes
-2. Modificar `<Route path="/polla-mundialista">` para usar un componente layout con `<Outlet />`
-3. Agregar `<Route path="/champions" element={<Champions />} />`
-
-**Componente layout (nuevo):** `src/pages/PollaLayout.tsx` — renderiza `<Outlet />` y posiblemente una sub-navegación con tabs o breadcrumb.
-
-### 4.2. Cambios en Sidebar.tsx
-
-**Comportamiento del menú "Polla mundialista":** Colapsable. El link principal "Polla mundialista" actúa como botón que expande/colapsa las 4 subpáginas. Al hacer clic en el botón padre:
-- Se despliegan "Mi Polla", "Mis 16", "Mi Campeón", "Mi Goleador" con indentación visual.
-- Al hacer clic nuevamente, se colapsan.
-- Si el usuario está en cualquiera de estas subpáginas, el menú se mantiene expandido automáticamente (estado activo).
-
-**Links actuales que cambian:**
-- "Polla mundialista" → ahora es un botón colapsable (no un link directo). Su ruta por defecto al expandirse es `/polla-mundialista/mi-polla`.
-
-**Nuevos links (subpáginas de "Polla mundialista", con indentación visual):**
-- "Mi Polla" → `/polla-mundialista/mi-polla` (ícono: `Trophy`)
-- "Mis 16" → `/polla-mundialista/mis-16` (ícono: `Swords`)
-- "Mi Campeón" → `/polla-mundialista/mi-campeon` (ícono: `Crown`)
-- "Mi Goleador" → `/polla-mundialista/mi-goleador` (ícono: `Target`)
-
-**Nuevo link independiente:**
-- "Champions" → `/champions` (ícono: `Star`) — ubicado después de "Polla mundialista", antes de "Resultados".
-
-### 4.3. Página: Mis16.tsx — Bracket interactivo
-
-**La página tiene dos vistas según la disponibilidad de datos:**
-
-#### Vista A: Fase de grupos (actual, sin datos de dieciseisavos)
-
-Cuando `system/round_of_32_matches` no existe o está vacío:
-- Mostrar `glass-card` centrada con ícono de calendario y texto:
-  > "El torneo se encuentra en fase de grupos. La predicción de eliminación directa estará disponible cuando comiencen los dieciseisavos."
-- No se muestra el bracket ni el modal de predicción.
-- El link en el sidebar sigue visible y funcional.
-
-#### Vista B: Fase de eliminación (cuando hay datos)
-
-Cuando `system/round_of_32_matches` tiene 16 partidos, se renderiza el bracket completo.
-
-**Layout:** Visualización de bracket de eliminación directa estilo torneo, con 5 columnas (dieciseisavos → octavos → cuartos → semifinal → final). Responsive: en desktop se ven las 5 columnas, en mobile se puede hacer scroll horizontal.
-
-**Cada partido se renderiza como un botón (`glass-card`):**
-```
-[bandera_home] equipo_home - equipo_away [bandera_away]
-       [score_home]  -  [score_away]
-```
-- Si el slot está vacío (equipos no definidos por la API aún): mostrar "vs" con texto placeholder.
-- Si el slot tiene equipos: mostrar banderas y nombres.
-
-**Al hacer clic en un partido de dieciseisavos (matches 1-16):**
-1. Se abre un modal centrado en pantalla con overlay semitransparente
-2. El modal muestra:
-   - Banderas y nombres de ambos equipos (no editables)
-   - Checkbox debajo de cada equipo: "Avanza a octavos" (solo uno puede estar marcado)
-   - Inputs numéricos para el marcador de cada equipo
-   - Botón "Guardar"
-3. Al hacer clic fuera del modal (en el overlay), se cierra y los cambios no guardados se descartan
-4. Al guardar, se actualiza el documento en `/brackets/{userId}`
-
-**Al hacer clic en un partido de rondas posteriores (matches 17-32):**
-- Misma mecánica de modal, pero los equipos ya están definidos por las predicciones de rondas anteriores (propagación automática).
-- Si el usuario aún no ha definido los ganadores de los partidos anteriores, el slot muestra "Por definir".
-
-**Estados visuales de cada partido en el bracket:**
-- **Vacío:** Sin equipos asignados (dieciseisavos sin datos de API). Borde punteado, texto "vs".
-- **Pendiente:** Equipos visibles pero sin predicción del usuario. Borde normal.
-- **Completado:** Predicción guardada (score + winner). Borde verde (--color-success) y pequeño check.
-- **Bloqueado:** Partido ya comenzó (no editable). Borde gris, candado.
-
-**Propagación automática (lógica frontend):**
+**`ActiveCardInput` (dto para creación):**
 ```typescript
-function propagateBracket(matches: BracketMatch[]): BracketMatch[] {
-  // Para cada ronda, los ganadores de la ronda anterior determinan los equipos
-  // Ej: winner de match-1 → homeTeam de match-17, winner de match-2 → awayTeam de match-17
+interface ActiveCardInput {
+  tournamentId: string;
+  fixtureId: number;
+  homeTeamApiId: number;
+  awayTeamApiId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamLogo: string;
+  awayTeamLogo: string;
+  date: string;
+  stadium: string;
+  tokenCost: number;
+  involvesColombia: boolean;
+  fixtureStatus: 'NS' | 'LIVE' | 'FT' | 'AET' | 'PEN' | null;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  createdBy: string;
 }
 ```
-Esta función se ejecuta cada vez que el usuario guarda un cambio. NO modifica Firestore directamente; solo actualiza el estado local para reflejar los equipos en rondas posteriores.
 
-### 4.4. Página: MiCampeon.tsx — Selección de campeón
+Agregar constantes en un archivo nuevo `src/constants/tournaments.ts`:
+```typescript
+export const TOURNAMENTS = {
+  WORLD_CUP_2026: 'world_cup_2026',
+  CHAMPIONS_LEAGUE_2025: 'champions_league_2025',
+} as const;
 
-**Layout:** Tarjeta `glass-card` centrada con:
-- Título: "¿Quién será el campeón?"
-- Dropdown/select con los 48 equipos (obtenidos de `getTeamsByGroup()`)
-- Cada opción muestra: bandera + nombre del equipo
-- Botón "Guardar"
-- Si ya hay selección guardada, mostrar la bandera y nombre del equipo seleccionado con opción de cambiar
+export const COLOMBIA_API_ID = 8;
 
-**Guardado:** Campo `campeon` en el documento `/brackets/{userId}`.
+export type TournamentId = typeof TOURNAMENTS[keyof typeof TOURNAMENTS];
+```
 
-### 4.5. Página: MiGoleador.tsx — Selección de goleador
+**Constantes de liga (API-Football):**
+```typescript
+export const LEAGUES = {
+  [TOURNAMENTS.WORLD_CUP_2026]: { apiId: 1, name: 'World Cup 2026', season: 2026 },
+  [TOURNAMENTS.CHAMPIONS_LEAGUE_2025]: { apiId: 2, name: 'Champions League', season: 2025 },
+} as const;
+```
 
-**Layout:** Tarjeta `glass-card` centrada con:
-- Título: "¿Quién será el goleador?"
-- Input de búsqueda con autocompletado (combobox)
-- El usuario escribe y la lista se filtra en tiempo real mostrando sugerencias
-- Cada sugerencia muestra: foto del jugador + nombre + equipo
-- Si el usuario escribe pero no selecciona de la lista, NO puede guardar
-- Botón "Guardar" (deshabilitado hasta que se seleccione un jugador)
-- Si ya hay selección guardada, mostrar foto + nombre + equipo con opción de cambiar
+### 3.4. Cambios en `firestore.rules`
 
-**Datos:** Los jugadores se obtienen de la colección plana `/players/world_cup_2026/` usando la función `searchPlayers()` con búsqueda incremental (orderBy + startAt/endAt). No se cargan todos los jugadores de una vez; solo los que coinciden con el término de búsqueda (máximo 20 resultados por query).
+```python
+match /tournaments/{tournamentId}/active_cards/{cardId} {
+  allow read: if isAuthenticated();
+  allow create: if isAdmin() &&
+    // El fixture debe estar en estado NS (no iniciado) al momento de crear la tarjeta
+    request.resource.data.fixtureStatus == 'NS';
+  allow update: if isAdmin() &&
+    // Solo tokenCost e isActive son editables después de creación
+    (!('fixtureId' in request.resource.data) || request.resource.data.fixtureId == resource.data.fixtureId) &&
+    (!('homeTeamApiId' in request.resource.data) || request.resource.data.homeTeamApiId == resource.data.homeTeamApiId) &&
+    (!('awayTeamApiId' in request.resource.data) || request.resource.data.awayTeamApiId == resource.data.awayTeamApiId) &&
+    (!('homeTeamName' in request.resource.data) || request.resource.data.homeTeamName == resource.data.homeTeamName) &&
+    (!('awayTeamName' in request.resource.data) || request.resource.data.awayTeamName == resource.data.awayTeamName) &&
+    (!('date' in request.resource.data) || request.resource.data.date == resource.data.date) &&
+    (!('stadium' in request.resource.data) || request.resource.data.stadium == resource.data.stadium) &&
+    (!('involvesColombia' in request.resource.data) || request.resource.data.involvesColombia == resource.data.involvesColombia) &&
+    // fixtureStatus no puede cambiarse a 'NS' si ya no lo era
+    request.resource.data.fixtureStatus == resource.data.fixtureStatus;
+  allow delete: if isAdmin();  // Las predicciones asociadas ya tienen datos desnormalizados y no se rompen
+}
+```
 
-**Guardado:** Campo `goleador` en el documento `/brackets/{userId}`.
+**Nota:** La validación de duplicados se hace en el frontend (consulta por `fixtureId` antes de crear). La regla de Firestore previene escrituras accidentales. **Inmutabilidad:** Una vez creada, solo `tokenCost` e `isActive` pueden cambiar. Los campos esenciales (equipos, fecha, stadium) son inmutables post-creación para proteger la integridad del historial de predicciones.
 
-### 4.6. Página: Champions.tsx — Placeholder
+```python
+match /tournaments/{tournamentId}/fixtures/{fixtureId} {
+  allow read: if isAuthenticated();
+  allow write: if isAdmin();
+}
 
-Página vacía con un título "Champions League — Próximamente" usando `glass-card`. Sin funcionalidad. Solo la ruta y el link en sidebar.
+match /tournaments/{tournamentId}/flat_teams/{teamApiId} {
+  allow read: if isAuthenticated();
+  allow write: if isAdmin();
+}
 
-## 5. Lógica de Reglas de Negocio
+match /tournaments/{tournamentId}/system/sync_status {
+  allow read: if isAdmin();
+  allow write: if isAdmin();  // solo admins y bots escriben
+}
+```
 
-### 5.1. Bloqueo de partidos
+### 3.5. Script de poblado: `legacy_python/sync_tournament_fixtures.py`
 
-- Un partido de dieciseisavos se bloquea cuando su `date` es anterior a `now() + 1 hora`.
-- Los partidos de rondas posteriores no tienen fecha hasta que se definan los ganadores de la ronda anterior, por lo que no se bloquean hasta que tengan equipos asignados y fecha.
-- Un partido bloqueado no puede editarse (ni score ni winner).
-- El campeón y goleador pueden editarse hasta el inicio del torneo (June 11, 2026).
+**Objetivo:** Fetch all fixtures from API-Football for a given league and store them in `tournaments/{tournamentId}/fixtures/`.
 
-### 5.2. Validaciones del modal de partido
+**Uso:**
+```bash
+# Poblar Mundial 2026
+python sync_tournament_fixtures.py --league 1 --season 2026
 
-- Si se marca un ganador, ambos scores deben estar completos.
-- El score del ganador debe ser mayor que el del perdedor.
-- En caso de empate en el score, se permite pero se muestra advertencia (los penales definen en la vida real, pero aquí el checkbox decide).
-- Si se ingresan scores pero no se marca ganador, al guardar se muestra error: "Selecciona qué equipo avanza".
+# Poblar Champions 2025
+python sync_tournament_fixtures.py --league 2 --season 2025
+```
 
-### 5.3. Inicialización del documento bracket
+**Flujo:**
+1. Escribe `{status: 'running', updatedAt}` en `sync_status`
+2. Llama `GET /fixtures?league={league}&season={season}` (API-Football)
+3. Por cada fixture:
+   - `setDoc(doc(db, 'tournaments/{tournamentId}/fixtures', fixture_id), data)` — idempotente
+   - Llama `/predictions?fixture={fixture_id}` para obtener probabilidades
+   - Si la API devuelve probabilidades, actualiza `probHome`, `probDraw`, `probAway` en el fixture
+   - `time.sleep(0.5)` entre llamadas para evitar rate limit
+   - Si falla, captura error y continúa con el siguiente (no aborta)
+4. Itera sobre los 12 grupos hardcoded (`['A','B','C','D','E','F','G','H','I','J','K','L']`). Para cada grupo, query `Teams/{tournamentId}/Group_{group}` y copia cada equipo a `tournaments/{tournamentId}/flat_teams/{teamApiId}` usando `apiId` como document ID. Esto aprovecha los datos completos ya poblado por `populate_teams.py`.
+5. Al terminar, escribe `{status: 'done' | 'partial', fixturesCount, teamsCount, updatedAt}`. Si fallaron fixtures, usa `'partial'` e incluye `partialFixturesCount` y `errorMessage`.
 
-- El documento `/brackets/{userId}` **se crea automáticamente** la primera vez que el usuario guarda una predicción en cualquiera de las tres páginas (Mis 16, Mi Campeón, Mi Goleador). No se crea al entrar a la página.
-- Si el documento no existe, el estado inicial del bracket muestra todos los slots vacíos.
-- El campo `matches` se inicializa como un array de 32 objetos `BracketMatch` con `homeTeam: null`, `awayTeam: null`, `homeScore: null`, `awayScore: null`, `winner: null`.
+**Consideraciones:**
+- Se ejecuta una vez al inicio del torneo (o manualmente cuando hay cambios).
+- Idempotente: puede re-ejecutarse sin crear duplicados.
+- Los campos `probHome/probDraw/probAway` se poblarán cuando `fetch_matches.py` los actualice (flujo existente).
+- **`flat_teams` se popula desde la colección `Teams/` existente**, no de la API. Esto evita llamadas extra a la API y usa datos ya cacheados.
 
-### 5.4. Estados de carga y error
+### 3.6. Nueva colección: `tournaments/{tournamentId}/flat_teams`
 
-- **Loading:** Spinner mientras se cargan los datos de `/brackets/{userId}` y `system/round_of_32_matches`.
-- **Error:** Si Firestore falla, mostrar mensaje de error con botón de reintentar.
-- **Sin datos (bracket no creado aún):** Mostrar el bracket con slots vacíos. El usuario puede empezar a llenar sin fricción.
-- **Saldo insuficiente:** Si `users/{uid}.tokens < costo`, mostrar mensaje: "No tienes suficientes tokens. Consigue más para participar." con el saldo actual visible. El botón de guardar se deshabilita.
-- **Cobro ya realizado:** Si `tokensSpent.bracket > 0`, no se vuelve a cobrar al editar.
+**Ruta:** `tournaments/world_cup_2026/flat_teams/{teamApiId}`
 
-### 5.5. Sistema de puntuación (para fase futura de comparación)
+**Problema:** Los 48 equipos están en subcolecciones `Teams/world_cup_2026/Group_A/{docId}` (4 equipos por grupo, 12 grupos). Leerlos todos requiere 12 consultas de subcolección. El modal de creación de tarjetas necesita la lista completa para el dropdown de Equipo 1.
 
-Cuando el bracket real del torneo esté disponible en el Home, se comparará con el bracket del usuario en "Mis 16" y se asignarán puntos por cada uno de los 32 matches:
+**Solución:** Crear una colección plana `flat_teams` que contenga los 48 equipos en documentos individuales. Se poblula durante `sync_tournament_fixtures.py`.
 
-| Acierto | Puntos |
-|---------|--------|
-| Marcador exacto (score local y visitante correctos) | **100 pt** |
-| Solo ganador correcto (score incorrecto pero el equipo que avanza es el mismo) | **50 pt** |
-| Predicción fallida (ganador incorrecto) | **0 pt** |
+```typescript
+interface FlatTeam {
+  apiId: number;
+  name: string;
+  code: string;           // FIFA 3 letras
+  logo: string;
+  country: string;
+  group: string;           // A-L
+  founded: number;
+  venue: {
+    name: string;
+    city: string;
+    capacity: number;
+  };
+  isHost: boolean;         // true para México, Canadá, USA
+  tournamentId: string;     // para filtrar con collectionGroup
+}
+```
 
-**Nota:** El scoring solo aplica a los 32 matches del bracket.
+**Lectura eficiente en frontend:** `getTeamsByTournament(tournamentId)` hace una sola query `collectionGroup('flat_teams')` filtrada por `tournamentId`. Requiere un índice compuesto (ver sección 3.7).
 
-**Cálculo del puntaje total del usuario:** Suma de los puntos obtenidos en los 32 matches. Puntaje máximo posible: 32 × 100 = 3200 pt.
+### 3.7. Índices compuestos de Firestore
 
-**Implementación (futura):** Un script de bot comparará los fixtures reales del torneo contra cada `/brackets/{userId}` y escribirá el puntaje en un campo `score` dentro del documento del bracket. La UI de "Mis 16" mostrará el puntaje acumulado en tiempo real.
+**⚠️ CRÍTICO:** El Web SDK de Firestore **requiere** índices explícitos para queries compuestas. Sin ellos, las queries fallan con "Missing or insufficient permissions" — un error engañoso que parece problema de reglas pero es falta de índices.
 
-**"Mi Campeón" y "Mi Goleador":** No usan puntaje. Simplemente se determina si la predicción fue `GANADA` o `PERDIDA` cuando finalice el torneo. El bot asignará un campo `campeonResult` y `goleadorResult` con estos valores.
+**Índices requeridos en `firestore.indexes.json`:**
 
-### 5.6. Precio en tokens
+```json
+[
+  {
+    "collectionGroup": "active_cards",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "tournamentId", "order": "ascending" },
+      { "fieldPath": "isActive", "order": "ascending" }
+    ]
+  },
+  {
+    "collectionGroup": "active_cards",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "involvesColombia", "order": "ascending" },
+      { "fieldPath": "isActive", "order": "ascending" }
+    ]
+  },
+  {
+    "collectionGroup": "active_cards",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "tournamentId", "order": "ascending" },
+      { "fieldPath": "fixtureId", "order": "ascending" }
+    ]
+  },
+  {
+    "collectionGroup": "flat_teams",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "tournamentId", "order": "ascending" }
+    ]
+  },
+  {
+    "collectionGroup": "fixtures",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "tournamentId", "order": "ascending" },
+      { "fieldPath": "homeTeam.apiId", "order": "ascending" }
+    ]
+  },
+  {
+    "collectionGroup": "fixtures",
+    "queryScope": "COLLECTION",
+    "fields": [
+      { "fieldPath": "tournamentId", "order": "ascending" },
+      { "fieldPath": "awayTeam.apiId", "order": "ascending" }
+    ]
+  }
+]
+```
 
-Cada funcionalidad tiene un costo fijo en tokens que se descuenta del saldo del usuario (`users/{uid}.tokens`) al guardar por primera vez:
+**Deploy:** `npx firebase deploy --only firestore:indexes`. Incluir en el To-Do (tarea 5).
 
-| Funcionalidad | Costo |
-|---------------|-------|
-| Bracket completo (Mis 16) | **15 tokens** |
-| Mi Campeón | **10 tokens** |
-| Mi Goleador | **10 tokens** |
+### 3.8. Documento de estado de sincronización: `sync_status`
 
-**Total máximo:** 35 tokens si el usuario participa en las tres.
+**Ruta:** `tournaments/{tournamentId}/system/sync_status`
 
-**Reglas de cobro:**
-- El cobro se realiza una sola vez por funcionalidad (no por partido ni por edición).
-- El documento `/brackets/{userId}` incluye un campo `tokensSpent: { bracket: number, campeon: number, goleador: number }` que registra cuánto se pagó por cada una (0 si no se ha pagado aún).
-- Al guardar por primera vez en Mis 16, se descuenta `increment(-15)` de `users/{uid}.tokens` y se registra `tokensSpent.bracket = 15`.
-- Ídem para Campeón (10) y Goleador (10) al guardar en sus respectivas páginas.
-- Una vez pagado, el usuario puede editar sus predicciones sin costo adicional.
-- Si el usuario no tiene tokens suficientes, se muestra un mensaje de error y no se permite guardar.
+```typescript
+interface SyncStatus {
+  status: 'idle' | 'running' | 'done' | 'partial' | 'error';
+  lastSyncAt: Timestamp | null;
+  fixturesCount: number;    // cuántos fixtures se guardaron en la última sync
+  teamsCount: number;       // cuántos equipos se guardaron
+  errorMessage: string | null;
+  partialFixturesCount?: number;  // cuando status === 'partial': cuántos se alcanzaron a guardar
+  updatedAt: Timestamp;
+}
+```
 
-## 6. To-Do List (Checklist de Progreso)
+**Estados de sync:**
+- `idle`: sin actividad reciente
+- `running`: sync en progreso
+- `done`: sync completada exitosamente
+- `partial`: sync completada pero con errores (algunos fixtures/equipos no se guardaron)
+- `error`: sync fallida (ningún fixture/equipo se guardó)
+
+**Propósito:** Permite que el frontend haga polling del estado de sincronización. El workflow `sync_fixtures.yml` escribe en este documento antes y después de ejecutar.
+
+**Nota sobre radares:** Los documentos `system/radar_match` y `system/colombia_match` en la ruta legacy (`system/`) siguen existiendo y `fetch_matches.py` los actualiza. **Home.tsx no necesita cambios** — continúa leyendo de esos documentos legacy. Cuando `active_cards` esté verificado, se puede migrar los radares a `tournaments/world_cup_2026/system/{radar_match,colombia_match}` en un futuro.
+
+---
+
+## 4. Backend / APIs (Scripts de Python)
+
+### 4.1. Nuevo script: `legacy_python/sync_tournament_fixtures.py`
+
+Ver sección 3.5.
+
+### 4.2. Deprecación de `worldcup_path`
+
+`worldcup_path` queda obsoleto. Se elimina su uso en el frontend. Las páginas "Mi Polla" y "Champions" leen exclusivamente de `active_cards`.
+
+`fetch_matches.py` ya no escribirá en `worldcup_path`. Su lógica se simplifica:
+
+1. **Radares** (`radar_match`, `colombia_match`): se mantienen como están — datos del próximo partido.
+2. **Actualización de probabilidades:** Para cada `active_card` con `isActive: true`, `fetch_matches.py` obtiene el `fixtureId` y llama a `/predictions?fixture={id}`. Si la API devuelve probabilidades, actualiza `probHome`, `probDraw`, `probAway` en la `active_card`.
+3. **Auto-desactivación:** Si un fixture cambia de estado `NS` (Not Started) a `LIVE` o `FT`, `fetch_matches.py` actualiza en la `active_card` correspondiente: `isActive: false` **y** `fixtureStatus: 'LIVE'/'FT'` para mantener consistencia.
+4. **Sincronización de datos del fixture:** Si `fixtures/{fixtureId}` se actualizó en la sync (nuevos datos de API), `fetch_matches.py` también actualiza los campos `date`, `stadium`, `venueCity` en la `active_card` si existen diferencias.
+
+**Nota de implementación:** `fetch_matches.py` mantiene un mapeo en memoria de `active_cards` consultando todos los documentos con `isActive: true` al inicio del ciclo. Esto evita iterar toda la colección cada vez (costoso). El mapeo se actualiza cuando una tarjeta se activa/desactiva via Admin.
+
+**Rate limit:** Al actualizar probabilidades para cada `active_card`, se agrega `time.sleep(0.5)` entre llamadas a `/predictions`. Si la API retorna 429 (rate limit exceeded), el script espera 60 segundos y reintenta una vez. Si falla de nuevo,跳过 esa tarjeta y continua con la siguiente.
+
+### 4.3. Modificación a `auditor.py` y `fetch_results.py`
+
+No requiere cambios; siguen escribiendo a `system/recent_results` y sellando predicciones.
+
+---
+
+## 5. Frontend: Interfaces y Componentes (UI/UX)
+
+### 5.1. Botón flotante del Admin
+
+**Ubicación:** Esquina inferior derecha, `position: fixed`, siempre visible cuando el usuario es admin.
+
+**Componente nuevo:** `src/components/AdminFab.tsx`
+
+```
+[+ FAB]  →  Al clic se abre un modal/drawer
+```
+
+**Estados del FAB:**
+- Default: ícono `Plus` con fondo dorado (`var(--primary)`)
+- Hover: sombra elevada, scale 1.05
+- Con notificación (tarjetas creadas desde última visita): badge con contador. Se calcula comparando `createdAt` de cada tarjeta contra `localStorage['lastVisit']`. Al abrir el modal se actualiza `lastVisit` a `now()`.
+- Disabled state mientras `sync_status.status === 'running'` (para evitar crear tarjetas mientras se sincronizan fixtures).
+
+### 5.2. Modal/Drawer de creación de tarjetas
+
+**Componente nuevo:** `src/components/AdminCreateCardModal.tsx`
+
+**Trigger:** Click en el AdminFab.
+
+**Layout del modal:**
+
+```
+│  Fecha: 2026-06-17  |  Hora: 22:00             │
+│  Estadio: Estadio Azteca                         │
+│  Ciudad: Ciudad de México                        │
+│                                                 │
+│  Probabilidades:                                │
+│  Local 50% | Empate 26% | Visitante 24%        │
+│  Costo (tokens): [3]                            │
+```
+
+**Comportamiento de los dropdowns:**
+
+1. **Torneo** (dropdown 1):
+   - Opciones: "World Cup 2026", "Champions League 2025"
+   - Al cambiar, limpia selección de Equipo 1 y Equipo 2
+
+2. **Equipo 1** (dropdown 2):
+   - Llama `getAllTeamsByTournament(tournamentId)` → lista de 48 equipos (World Cup) o ~32 (Champions)
+   - Muestra: bandera + nombre
+   - Al seleccionar, dispara consulta a Firestore
+
+3. **Equipo 2** (dropdown 3):
+   - Query: `getOpponentsForTeam(team1ApiId, tournamentId)`
+   - Filtra `tournaments/{tournamentId}/fixtures` donde `homeTeam.apiId == team1ApiId OR awayTeam.apiId == team1ApiId`
+   - Muestra los equipos resultantes con bandera + nombre
+   - **Solo se habilita** cuando Equipo 1 está seleccionado
+   - Si hay error de conexión o fixtures vacíos: muestra mensaje: "No se pudieron cargar los oponentes. Sincroniza fixtures primero."
+   - Si no hay oponentes (equipo no tiene partidos en ese torneo): "No hay partidos programados para este equipo en este torneo"
+
+ 4. **Datos del fixture** (se muestran automáticamente):
+   - Después de seleccionar Equipo 1 y Equipo 2, busca el fixture en Firestore y muestra:
+     - Fecha y hora
+     - Estadio y ciudad
+     - Probabilidades (si están disponibles)
+   - Si el fixture no existe en Firestore (fixtures no sincronizados): mostrar mensaje de error en rojo: "Este partido no existe en Firestore. Ejecuta 'Sincronizar fixtures' primero."
+
+ 5. **Costo tokens** (input numérico):
+   - Valor por defecto: 3
+   - Rango válido: 1-10
+
+ **Modo edición (futuro):** El mismo modal se reutiliza para editar una tarjeta existente. Al abrir en modo edición, los dropdowns aparecen deshabilitados (no se puede cambiar equipo1/equipo2 de una tarjeta ya creada), solo `tokenCost` e `isActive` son editables. El botón dice "Actualizar Tarjeta".
+
+### 5.3. Nuevas funciones en `src/services/firestore.ts`
+
+```typescript
+import { TOURNAMENTS, COLOMBIA_API_ID } from '../constants/tournaments';
+
+// Obtiene todos los equipos de un torneo (desde flat_teams)
+// Usa collectionGroup('flat_teams').where('tournamentId', '==', tournamentId)
+// Fallback: si retorna vacío, extrae equipos únicos desde fixtures/{tournamentId}
+getTeamsByTournament(tournamentId: string): Promise<FlatTeam[]>
+
+// Obtiene los oponentes de un equipo específico dentro de un torneo
+// Query: fixtures donde homeTeam.apiId == teamId OR awayTeam.apiId == teamId
+// Dos queries separadas (home + away) + merge en cliente (Firestore no soporta OR)
+// Retorna: array de { apiId, name, logo } extraído del fixture (no depende de flat_teams)
+getOpponentsForTeam(teamApiId: number, tournamentId: string): Promise<{ apiId: number; name: string; logo: string }[]>
+
+// Obtiene el fixture completo dado team1 y team2
+getFixtureByTeams(team1ApiId: number, team2ApiId: number, tournamentId: string): Promise<TournamentFixture | null>
+
+// Obtiene todas las tarjetas activas para Mi Polla (Colombia)
+// Query: collectionGroup('active_cards')
+//   .where('tournamentId', '==', 'world_cup_2026')
+//   .where('involvesColombia', '==', true)
+//   .where('isActive', '==', true)
+getActiveCardsForPolla(): Promise<ActiveCard[]>
+
+// Obtiene todas las tarjetas activas para Champions
+// Query: collectionGroup('active_cards')
+//   .where('tournamentId', '==', 'champions_league_2025')
+//   .where('isActive', '==', true)
+getActiveCardsForChampions(): Promise<ActiveCard[]>
+
+// Crea una nueva tarjeta activa
+// Validaciones antes de crear:
+//  1. Query por fixtureId para verificar que no exista duplicado
+//  2. Verificar que fixture.status === 'NS' (partido no ha iniciado)
+// Si falla validación, lanza error con mensaje específico
+createActiveCard(card: ActiveCardInput): Promise<string>
+
+// Admin: lista todas las tarjetas (para gestión)
+// Query: active_cards donde tournamentId == id (o todas si no se especifica)
+getAllActiveCardsAdmin(tournamentId?: string): Promise<ActiveCard[]>
+
+// Admin: actualiza tokenCost e isActive de una tarjeta
+updateActiveCard(cardId: string, tournamentId: string, updates: Partial<ActiveCard>): Promise<void>
+
+// Admin: elimina una tarjeta
+deleteActiveCard(cardId: string, tournamentId: string): Promise<void>
+```
+
+**Nota sobre `getOpponentsForTeam`:** Firestore no soporta OR en queries. Para obtener los oponentes se ejecutan DOS queries en paralelo:
+1. `fixtures.where('tournamentId', '==', t).where('homeTeam.apiId', '==', teamApiId)`
+2. `fixtures.where('tournamentId', '==', t).where('awayTeam.apiId', '==', teamApiId)`
+
+Los resultados de ambas se mergean. El **oponente** se extrae así:
+- Si el query fue `homeTeam.apiId == teamApiId` → el oponente es `awayTeam` del fixture
+- Si el query fue `awayTeam.apiId == teamApiId` → el oponente es `homeTeam` del fixture
+
+Esto retorna un array de `{ apiId, name, logo }` con los equipos que enfrentarán a `teamApiId`, extraídos directamente del fixture (no depende de `flat_teams`).
+
+### 5.4. Cambios en Admin.tsx
+
+Agregar sección de gestión de tarjetas:
+- Tabla con tarjetas activas/inactivas, con columnas: equipos, fecha, costo, estado, acciones
+- Toggle para activar/desactivar (inline en la tabla)
+- Botón "Editar" (lápiz) → abre modal en modo edición
+- Botón "Eliminar" (basura) → confirmación antes de borrar
+- Botón "Sincronizar fixtures" → dropdown para seleccionar torneo → dispatcha `sync_fixtures.yml` via `workflow_dispatch` con `{ tournament: 'world_cup_2026' | 'champions_league_2025' }`. Muestra estado en tiempo real via `onSnapshot` en `sync_status`.
+- Botón "Ver Fixture" → abre modal de solo lectura con datos completos del fixture en Firestore
+
+### 5.5. Cambios en Home.tsx y PollaMundialista.tsx
+
+**Home.tsx** no requiere cambios. Los radares (`colombia_match`, `radar_match`) muestran el próximo partido y son independientes de `active_cards`.
+
+**PollaMundialista.tsx:** Eliminar referencia a `worldcup_path`. Leer de `active_cards` filtrado por `involvesColombia: true` (sección 5.3).
+
+### 5.6. Cambios en Champions.tsx
+
+- Leer tarjetas de `tournaments/champions_league_2025/active_cards`
+- Mismo componente de MatchCard que Mi Polla (reutilizable)
+
+### 5.7. Flujo de predicción del usuario (no cambia)
+
+El flujo del usuario para hacer una predicción en "Mi Polla" o "Champions" **no cambia**. La lógica existente de:
+- Mostrar tarjetas con probabilidades
+- Permitir ingreso de marcador
+- Guardar predicción en `/predictions/{uid}_{fixtureId}`
+- Descontar tokens
+- Mostrar historial en "Mis Apuestas"
+
+Sigue funcionando igual. Solo cambia la **fuente de datos**: antes leía de `worldcup_path`, ahora lee de `active_cards`. Los campos desnormalizados (`matchDetails`, `homeLogo`, `awayLogo`) garantizan que el historial no se rompe si una tarjeta se modifica o elimina después.
+
+---
+
+## 6. Lógica de Reglas de Negocio
+
+### 6.1. Sincronización manual (bajo demanda)
+
+**Cuándo sincronizar:**
+- **Fase de grupos (ahora - junio 27):** Admin ejecuta "Sincronizar fixtures" una vez → se puebla `fixtures` con los 48 partidos del Mundial.
+- **Fase de knockout (después del 27 junio):** Admin vuelve a ejecutar para traer octavos/cuartos/semifinal/final (partidos nuevos que la API ahora conoce).
+
+**Cómo funciona:**
+- El botón "Sincronizar fixtures" en Admin dispatcha el workflow `sync_fixtures.yml` con `workflow_dispatch`.
+- Los fixtures ya existentes no se duplican (`setDoc` es idempotente, se puede re-ejecutar sin riesgos).
+
+### 6.2. `worldcup_path` queda deprecado
+
+- Se elimina toda referencia a `worldcup_path` en el frontend.
+- Las páginas "Mi Polla" y "Champions" leen exclusivamente de `active_cards`.
+- El documento `tournaments/world_cup_2026/system/worldcup_path` permanece en Firestore como backup temporal hasta que `active_cards` esté verificado en producción.
+
+### 6.3. Flujo completo para crear una tarjeta
+
+1. Admin ingresa a Admin → sección "Tarjetas"
+2. Clic en "Sincronizar con API" → popula `fixtures` con todos los partidos del torneo
+3. Clic en FAB (+) → abre modal
+4. Selecciona Torneo → World Cup 2026
+5. Selecciona Equipo 1 → Colombia
+6. Sistema consulta Firestore → muestra oponentes de Colombia (8 equipos)
+7. Selecciona Equipo 2 → Uzbekistán
+ 8. Sistema muestra: fecha, estadio, ciudad, probabilidades (si existen)
+ 8b. Si muestra error: "Este partido no existe en Firestore. Ejecuta 'Sincronizar fixtures' primero." → admin debe sincronizar antes de continuar
+ 8c. Si `fixture.status` es `null` o `undefined`: "El estado del partido no está disponible. Espera a que la API confirme el horario."
+ 9. Admin ajusta tokenCost si quiere (default 3)
+10. Clic en "Crear Tarjeta" → guarda en `active_cards`
+11. La tarjeta aparece en "Mi Polla" para todos los usuarios
+
+### 6.4. Estados de una tarjeta
+
+| Estado | Descripción |
+|--------|-------------|
+| `isActive: true` | Visible para usuarios en Mi Polla/Champions |
+| `isActive: false` | Oculta de usuarios; solo visible en Admin |
+
+**Estado vacío (sin tarjetas):** Si `getActiveCardsForPolla()` retorna array vacío, mostrar mensaje centrado: "No hay tarjetas activas. Los partidos aparecerán aquí cuando el admin los configure." (estilo glass-card con ícono de calendario).
+
+### 6.5. Probabilidades
+
+- `sync_tournament_fixtures.py` obtiene probabilidades al llamar al endpoint `/predictions` de API-Football por cada fixture.
+- `fetch_matches.py` actualiza las probabilidades cada 5 minutos para los fixtures activos.
+- Si no hay probabilidades disponibles, mostrar "—" en la tarjeta.
+
+### 6.6. Permisos
+
+- Solo admins pueden crear/editar/toggle `active_cards`
+- Todos los usuarios autenticados pueden leer `active_cards`
+- Lectura de `fixtures` requiere auth (para evitar que competidores vean todos los partidos)
+
+### 6.7. Desactivación automática de tarjetas
+
+`fetch_matches.py` detecta cambios de estado en los fixtures:
+
+| Cambio de estado | Acción en `active_card` |
+|-----------------|-------------------------|
+| `NS` → `LIVE` | `isActive: false`, `fixtureStatus: 'LIVE'` |
+| `NS` → `FT` / `AET` / `PEN` | `isActive: false`, `fixtureStatus: 'FT'/'AET'/'PEN'` |
+
+Esto ocurre durante el ciclo normal de `fetch_matches.py` (cada 5 minutos). El admin también puede desactivar manualmente via Admin.
+
+**Regla de negocio:** Las tarjetas no desaparecen del historial de los usuarios; solo dejan de estar disponibles para nuevas predicciones.
+
+### 6.8. Validación al crear una tarjeta
+
+Antes de guardar una `ActiveCard`, el frontend valida:
+
+| Validación | Condición | Error si falla |
+|-----------|-----------|-----------------|
+| Fixture existe | `fixture` debe existir en `fixtures/{fixtureId}` | "Este partido no existe. Sincroniza primero." |
+| Partido no iniciado | `fixture.status === 'NS'` (null o cualquier otro valor = error) | "No se puede crear una tarjeta para un partido que ya inició." |
+| No existe duplicado | No existe otra `active_card` con el mismo `fixtureId` + `tournamentId` | "Ya existe una tarjeta para este partido." |
+
+**Validación defensiva:** Si `fixture.status` es `null` o `undefined` (API no ha seteado status aún), tratar como error: "El estado del partido no está disponible. Espera a que la API confirme el horario."
+
+### 6.9. Inmutabilidad post-creación
+
+Una vez creada una `ActiveCard`, sus campos esenciales son **inmutables**:
+- `fixtureId`, `homeTeamApiId`, `awayTeamApiId`, `homeTeamName`, `awayTeamName`, `date`, `stadium`, `involvesColombia`
+
+**Editables** después de creación:
+- `tokenCost` (para cambiar el precio de la apuesta)
+- `isActive` (para ocultar/mostrar la tarjeta)
+
+**Rationale:** Si se permitiera cambiar equipos o fecha después de que usuarios ya hicieron predicciones, el historial se rompería. Las predicciones guardan `matchDetails`, `homeLogo`, `awayLogo` desnormalizados. Para corregir errores, el admin elimina la tarjeta y crea una nueva.
+
+### 6.10. Feedback de sincronización en Admin
+
+El botón "Sincronizar fixtures" en Admin:
+
+1. **Antes de dispatch:** Guarda `{status: 'running', updatedAt}` en `sync_status`
+2. **Dispatch:** Llama `workflow_dispatch` con `inputs: { tournament: 'world_cup_2026' | 'champions_league_2025' }`
+3. **Durante:** El componente Admin hace `onSnapshot` en `sync_status`. Muestra badge o toast con estado (spinner si running, checkmark si done, X si error).
+4. **Después del workflow:** El script escribe `{status: 'done' | 'error', fixturesCount, teamsCount, errorMessage}` en `sync_status`.
+
+---
+
+## 7. To-Do List (Checklist de Progreso)
 
 *Agente: Marca con una `[x]` las tareas a medida que las vayas completando.*
 
-### Fase 1: Tipos de TypeScript y Servicios
-- [x] 1. Agregar interfaces `BracketMatch`, `Bracket`, `RoundOf32Match`, `FlatPlayer` en `src/types/firestore.ts`.
-- [x] 2. Agregar funciones `getUserBracket()`, `saveUserBracket()` (con writeBatch para tokens), `searchPlayers()` (query incremental a colección plana) en `src/services/firestore.ts`.
-- [x] 3. Agregar reglas de seguridad para `/brackets/{userId}` y `/players/{tournament}/{playerId}` en `firestore.rules`.
-- [x] 4. Modificar `legacy_python/populate_teams.py`: al guardar cada jugador, escribir también en la colección plana `/flat_players/{playerApiId}`. Re-ejecutar el script para poblar la colección plana.
+### [Categoría: Base de Datos]
+- [x] 1. Crear script `sync_tournament_fixtures.py` que: (a) haga fetch de fixtures de API-Football y guarde en `fixtures/{fixtureId}`, (b) copie equipos desde la colección `Teams/{tournamentId}/Group_X/` existente a `flat_teams/{teamApiId}`, (c) escriba estado en `sync_status` antes y después.
+- [x] 2. Definir interfaces `TournamentFixture`, `ActiveCard`, `ActiveCardInput`, `FlatTeam` y `SyncStatus` en `src/types/firestore.ts`.
+- [x] 3. Agregar reglas de seguridad para las nuevas colecciones en `firestore.rules` (incluyendo validación de inmutabilidad post-creación para `active_cards`).
+- [x] 4. Crear archivo `firestore.indexes.json` con los 6 índices compuestos descritos en sección 3.7.
+- [ ] 5. Ejecutar `npx firebase deploy --only firestore:indexes` para desplegar los índices.
+- [ ] 6. Ejecutar `sync_tournament_fixtures.py` una vez via GitHub Actions para poblar fixtures de World Cup 2026 y Champions League 2025.
+- [x] 6b. Modificar `fetch_matches.py` para: (a) actualizar probabilidades en `active_cards`, (b) auto-desactivar tarjetas cuando el partido inicia (`NS` → `LIVE`/`FT`), (c) ya no escribe en `worldcup_path`.
 
-### Fase 2: Reorganización de Rutas y Sidebar
-- [x] 5. Modificar `App.tsx`: implementar rutas anidadas bajo `/polla-mundialista` con layout `PollaLayout.tsx`, agregar ruta `/champions`.
-- [x] 6. Crear `src/pages/PollaLayout.tsx` (layout con Outlet para subpáginas de polla).
-- [x] 7. Actualizar `Sidebar.tsx`: menú colapsable "Polla mundialista" con 4 subpáginas indentadas (Mi Polla, Mis 16, Mi Campeón, Mi Goleador) + link independiente "Champions".
+### [Categoría: Frontend — Core]
+- [x] 7. Crear `src/constants/tournaments.ts` con `TOURNAMENTS`, `LEAGUES`, `COLOMBIA_API_ID`.
+- [x] 8. Crear `AdminFab.tsx` — botón flotante dorado en esquina inferior derecha.
+- [x] 9. Crear `AdminCreateCardModal.tsx` — modal con 3 dropdowns (torneo, equipo1, equipo2), datos del fixture, costo tokens, error por falta de sync, y modo edición.
+- [x] 10. Agregar función `getTeamsByTournament()` — usa `collectionGroup('flat_teams')`.
+- [x] 11. Agregar función `getOpponentsForTeam()` — dos queries paralelas (home + away) con merge en cliente.
+- [x] 12. Agregar función `getFixtureByTeams()` en `firestore.ts`.
+- [x] 13. Agregar función `createActiveCard()` con validaciones: duplicado (query por fixtureId), partido no iniciado (fixture.status === 'NS').
+- [x] 14. Agregar función `updateActiveCard()` y `deleteActiveCard()`.
 
-### Fase 3: Páginas Nuevas
-- [x] 8. Crear `src/pages/Mis16.tsx` — dos vistas: (A) mensaje "fase de grupos" cuando no hay datos, (B) bracket interactivo con 32 slots, modal de predicción, y propagación automática cuando `system/round_of_32_matches` está poblado.
-- [x] 9. Crear `src/pages/MiCampeon.tsx` — dropdown con 48 equipos para seleccionar campeón.
-- [x] 10. Crear `src/pages/MiGoleador.tsx` — combobox con autocompletado sobre 1616 jugadores (usa colección plana).
-- [x] 11. Crear `src/pages/Champions.tsx` — placeholder vacío.
+### [Categoría: Frontend — Integración]
+- [x] 15. Modificar `PollaMundialista.tsx` para leer de `active_cards` filtrado por `involvesColombia: true` (ya no usa `worldcup_path`).
+- [x] 16. Modificar `Champions.tsx` para leer de `tournaments/champions_league_2025/active_cards`.
+- [x] 17. Agregar sección de gestión de tarjetas en `Admin.tsx` con tabla, toggle, editar, eliminar, y botón de sincronización.
 
-### Fase 4: Reubicación de Contenido Existente
-- [x] 12. Renombrar/reubicar `PollaMundialista.tsx` para que sea la página "Mi Polla" bajo `/polla-mundialista/mi-polla`. Su funcionalidad no cambia; solo su ruta.
+### [Categoría: GitHub Actions]
+- [x] 19. Crear workflow `sync_fixtures.yml` con `on: workflow_dispatch` + `types: [workflow_dispatch]`. Se ejecuta desde la rama `main`. Debe escribir estado en `sync_status` antes y después de ejecutar. Acepta input `tournament` (dropdown: world_cup_2026 | champions_league_2025).
+- [x] 19b. Implementar polling de `sync_status` en Admin.tsx con `onSnapshot`. Mostrar spinner durante sync, checkmark al completar, mensaje de error si falla.
 
-### Fase 5: Verificación
-- [x] 13. Ejecutar `npm run build` y asegurar que TS compila sin errores ni warnings.
-- [x] 14. Ejecutar `npm run dev`, probar navegación manual: sidebar colapsable, rutas anidadas, páginas nuevas.
+### [Categoría: Deprecación de worldcup_path]
+- [x] 20. Eliminar referencias a `worldcup_path` en frontend (PollaMundialista.tsx, Home.tsx, firestore.ts, tipos). El documento en Firestore permanece como backup temporal.
+
+### [Categoría: Verificación]
+- [x] 21. Ejecutar `tsc -b && vite build` y verificar que compila sin errores.
+- [ ] 22. Probar `pnpm dev` y verificar: FAB visible para admin, modal abre/cierra, dropdowns funcionan, error state cuando no hay fixtures sync, tarjeta se crea/actualiza/elimina en Firestore.
+- [ ] 23. Verificar queries en Firestore console que los índices están activos y las queries retornan datos correctos.
