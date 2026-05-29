@@ -21,7 +21,7 @@ def update_api_status(db, response_headers):
         current_req = response_headers['x-ratelimit-requests-current']
         limit_req = response_headers.get('x-ratelimit-requests-limit', '7500')
         try:
-            db.collection("system").document("api_status").set({
+            db.collection("tournaments/world_cup_2026/system").document("api_status").set({
                 "requests_current": int(current_req),
                 "requests_limit": int(limit_req),
                 "last_updated": firestore.SERVER_TIMESTAMP

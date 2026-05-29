@@ -175,3 +175,103 @@ export interface GoleadorPick {
   createdAt: Timestamp;
   deletedAt: Timestamp | null;
 }
+
+export type FixtureStatus = 'NS' | 'LIVE' | 'FT' | 'AET' | 'PEN' | null;
+
+export interface TournamentFixtureTeam {
+  apiId: number;
+  name: string;
+  code: string;
+  logo: string;
+}
+
+export interface TournamentFixture {
+  fixtureId: number;
+  leagueId: number;
+  leagueName: string;
+  season: number;
+  tournamentId: string;
+  homeTeam: TournamentFixtureTeam;
+  awayTeam: TournamentFixtureTeam;
+  date: string;
+  stadium: string;
+  venueCity: string;
+  status: FixtureStatus;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface ActiveCard {
+  cardId: string;
+  tournamentId: string;
+  fixtureId: number;
+  homeTeamApiId: number;
+  awayTeamApiId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamLogo: string;
+  awayTeamLogo: string;
+  date: string;
+  stadium: string;
+  tokenCost: number;
+  involvesColombia: boolean;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  isActive: boolean;
+  fixtureStatus: FixtureStatus;
+  createdAt: Timestamp;
+  createdBy: string;
+}
+
+export interface ActiveCardInput {
+  tournamentId: string;
+  fixtureId: number;
+  homeTeamApiId: number;
+  awayTeamApiId: number;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamLogo: string;
+  awayTeamLogo: string;
+  date: string;
+  stadium: string;
+  tokenCost: number;
+  involvesColombia: boolean;
+  fixtureStatus: FixtureStatus;
+  probHome: number | null;
+  probDraw: number | null;
+  probAway: number | null;
+  createdBy: string;
+}
+
+export interface FlatTeam {
+  apiId: number;
+  name: string;
+  code: string;
+  logo: string;
+  country: string;
+  group: string;
+  founded: number | null;
+  venue: {
+    name: string;
+    city: string;
+    capacity: number;
+  };
+  isHost: boolean;
+  tournamentId: string;
+}
+
+export type SyncStatusValue = 'idle' | 'running' | 'done' | 'partial' | 'error';
+
+export interface SyncStatus {
+  status: SyncStatusValue;
+  lastSyncAt: Timestamp | null;
+  fixturesCount: number;
+  teamsCount: number;
+  errorMessage: string | null;
+  partialFixturesCount?: number;
+  updatedAt: Timestamp;
+}

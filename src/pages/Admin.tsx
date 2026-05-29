@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { onSnapshot, doc, collection, updateDoc, increment, getDocs, getDoc, deleteDoc, writeBatch, collectionGroup, query, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertTriangle, Trash2 } from 'lucide-react';
-import type { Prediction, AppUser } from '../types/firestore';
-import { Wifi, Coins, Plus, Minus, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet, History } from 'lucide-react';
+import { AlertTriangle, Trash2, Calendar, RefreshCw, Eye, ChevronDown, ChevronUp, Loader, FileSpreadsheet, History, Loader2, Play } from 'lucide-react';
+import type { Prediction, AppUser, ActiveCard, SyncStatus } from '../types/firestore';
+import { Wifi, Coins, Plus, Minus } from 'lucide-react';
+import { TOURNAMENTS } from '../constants/tournaments';
+import type { TournamentId } from '../constants/tournaments';
+import { getAllActiveCardsAdmin, updateActiveCard, deleteActiveCard } from '../services/firestore';
 
 export default function Admin() {
     const { currentUser } = useAuth() || {};
@@ -21,6 +24,12 @@ export default function Admin() {
     const [resetError, setResetError] = useState('');
     const [resetDone, setResetDone] = useState<{ predictions: number; brackets: number; tokensReset: number; duplicatesRemoved: number } | null>(null);
     const [picks, setPicks] = useState<Record<string, { campeon?: string; goleador?: string }>>({});
+    const [allCards, setAllCards] = useState<ActiveCard[]>([]);
+    const [isCardsOpen, setIsCardsOpen] = useState(true);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+    const [syncing, setSyncing] = useState(false);
+    const [syncingTournament, setSyncingTournament] = useState<TournamentId | null>(null);
+    const [syncError, setSyncError] = useState<string | null>(null);
 
     useEffect(() => {
         const q = query(collectionGroup(db, 'predictions'));
@@ -103,6 +112,33 @@ export default function Admin() {
         });
         return () => { unsubCampeon(); unsubGoleador(); };
     }, []);
+
+    useEffect(() => {
+        getAllActiveCardsAdmin()
+            .then(setAllCards)
+            .catch(() => setAllCards([]));
+    }, []);
+
+    useEffect(() => {
+        const unsub = onSnapshot(
+            doc(db, 'tournaments/world_cup_2026/system', 'sync_status'),
+            (snap) => {
+                if (snap.exists()) {
+                    setSyncStatus(snap.data() as SyncStatus);
+                }
+            }
+        );
+        return () => unsub();
+    }, []);
+
+    useEffect(() => {
+        if (!syncStatus || syncStatus.status !== 'running') {
+            setSyncing(false);
+            setSyncingTournament(null);
+            return;
+        }
+        setSyncing(true);
+    }, [syncStatus]);
 
     const addTokens = async (uid: string, amount: number) => {
         const finalAmount = amount || 1;
@@ -195,6 +231,46 @@ export default function Admin() {
         } catch (error) {
             console.error("Error removing tokens", error);
             alert("❌ Error al restar tokens.");
+        }
+    };
+
+    const handleSyncFixtures = async (tournamentId: TournamentId) => {
+        setSyncingTournament(tournamentId);
+        setSyncing(true);
+        setSyncError(null);
+        try {
+            const response = await fetch('https://api.github.com/repos/afemos027/La-polla-mundialista-2026/actions/workflows/sync_fixtures.yml/dispatches', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Authorization': `token ${import.meta.env.VITE_GITHUB_TOKEN}`,
+                },
+                body: JSON.stringify({ ref: 'main', inputs: { tournament: tournamentId } }),
+            });
+            if (!response.ok) {
+                setSyncError('Error dispatching workflow');
+            }
+        } catch (e) {
+            setSyncError('Error de conexión');
+        }
+    };
+
+    const handleToggleCard = async (card: ActiveCard) => {
+        try {
+            await updateActiveCard(card.cardId, card.tournamentId, { isActive: !card.isActive });
+            setAllCards(prev => prev.map(c => c.cardId === card.cardId ? { ...c, isActive: !c.isActive } : c));
+        } catch {
+            alert('Error al actualizar la tarjeta');
+        }
+    };
+
+    const handleDeleteCard = async (card: ActiveCard) => {
+        if (!confirm(`¿Eliminar la tarjeta de ${card.homeTeamName} vs ${card.awayTeamName}?`)) return;
+        try {
+            await deleteActiveCard(card.cardId, card.tournamentId);
+            setAllCards(prev => prev.filter(c => c.cardId !== card.cardId));
+        } catch {
+            alert('Error al eliminar la tarjeta');
         }
     };
 
@@ -502,6 +578,113 @@ export default function Admin() {
                                 <><Trash2 size={18} /> Formatear de Fábrica</>
                             )}
                         </button>
+                    </div>
+                )}
+            </div>
+
+            {/* 3. GESTIÓN DE TARJETAS */}
+            <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+                <div
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isCardsOpen ? '1.5rem' : '0', cursor: 'pointer' }}
+                    onClick={() => setIsCardsOpen(!isCardsOpen)}
+                >
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', margin: 0 }}>
+                        <Calendar size={20} /> Gestión de Tarjetas
+                    </h3>
+                    {isCardsOpen ? <ChevronUp size={20} color="var(--text-muted)" /> : <ChevronDown size={20} color="var(--text-muted)" />}
+                </div>
+
+                {isCardsOpen && (
+                    <div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                            <button
+                                className="btn-primary"
+                                style={{ padding: '8px 16px', fontSize: '0.85rem', width: 'auto', background: 'var(--color-success-bg)', border: '1px solid var(--color-success)', color: 'var(--color-success)' }}
+                                onClick={() => handleSyncFixtures(TOURNAMENTS.WORLD_CUP_2026)}
+                                disabled={syncing}
+                            >
+                                {syncing && syncingTournament === TOURNAMENTS.WORLD_CUP_2026 ? <Loader2 size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} /> : <Play size={14} style={{ marginRight: '6px' }} />}
+                                Sincronizar World Cup
+                            </button>
+                            <button
+                                className="btn-primary"
+                                style={{ padding: '8px 16px', fontSize: '0.85rem', width: 'auto', background: 'var(--color-success-bg)', border: '1px solid var(--color-success)', color: 'var(--color-success)' }}
+                                onClick={() => handleSyncFixtures(TOURNAMENTS.CHAMPIONS_LEAGUE_2025)}
+                                disabled={syncing}
+                            >
+                                {syncing && syncingTournament === TOURNAMENTS.CHAMPIONS_LEAGUE_2025 ? <Loader2 size={14} style={{ marginRight: '6px', animation: 'spin 1s linear infinite' }} /> : <Play size={14} style={{ marginRight: '6px' }} />}
+                                Sincronizar Champions
+                            </button>
+                            {syncStatus && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                    {syncStatus.status === 'running' && <><Loader2 size={14} className="spin" /> Sincronizando...</>}
+                                    {syncStatus.status === 'done' && <><span style={{ color: 'var(--color-success)' }}>✓</span> {syncStatus.fixturesCount} fixtures, {syncStatus.teamsCount} equipos</>}
+                                    {syncStatus.status === 'partial' && <><span style={{ color: 'var(--primary)' }}>⚠</span> Parcial: {syncStatus.partialFixturesCount} fixtures</>}
+                                    {syncStatus.status === 'error' && <><span style={{ color: 'var(--color-danger)' }}>✗</span> Error</>}
+                                    {syncStatus.status === 'idle' && <span>Idle</span>}
+                                </div>
+                            )}
+                            {syncError && <span style={{ color: 'var(--color-danger)', fontSize: '0.85rem' }}>{syncError}</span>}
+                        </div>
+
+                        <div className="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Partido</th>
+                                        <th>Fecha</th>
+                                        <th>Estadio</th>
+                                        <th>Costo</th>
+                                        <th>Colombia</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allCards.length === 0 ? (
+                                        <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hay tarjetas creadas</td></tr>
+                                    ) : allCards.map(card => (
+                                        <tr key={card.cardId}>
+                                            <td style={{ fontWeight: 600 }}>{card.homeTeamName} vs {card.awayTeamName}</td>
+                                            <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                {card.date ? new Date(card.date).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short', hour12: true }) : '—'}
+                                            </td>
+                                            <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{card.stadium || '—'}</td>
+                                            <td>{card.tokenCost}</td>
+                                            <td>{card.involvesColombia ? 'Sí' : 'No'}</td>
+                                            <td>
+                                                <button
+                                                    className="btn-primary"
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '0.75rem',
+                                                        width: 'auto',
+                                                        background: card.isActive ? 'var(--color-success-bg)' : 'var(--glass-bg)',
+                                                        border: `1px solid ${card.isActive ? 'var(--color-success)' : 'var(--glass-border)'}`,
+                                                        color: card.isActive ? 'var(--color-success)' : 'var(--text-muted)',
+                                                    }}
+                                                    onClick={() => handleToggleCard(card)}
+                                                >
+                                                    {card.isActive ? 'Activa' : 'Inactiva'}
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    <button
+                                                        className="btn-danger-small"
+                                                        style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto' }}
+                                                        onClick={() => handleDeleteCard(card)}
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>

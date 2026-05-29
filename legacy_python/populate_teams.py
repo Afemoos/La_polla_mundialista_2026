@@ -137,7 +137,7 @@ def fetch_all_teams(db):
 
     if db and 'x-ratelimit-requests-current' in response.headers:
         try:
-            db.collection("system").document("api_status").set({
+            db.collection("tournaments/world_cup_2026/system").document("api_status").set({
                 "requests_current": int(response.headers['x-ratelimit-requests-current']),
                 "requests_limit": int(response.headers.get('x-ratelimit-requests-limit', '7500')),
                 "last_updated": firestore.SERVER_TIMESTAMP
