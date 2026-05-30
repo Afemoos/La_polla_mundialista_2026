@@ -97,13 +97,54 @@ export async function getTeamsByTournament(tournamentId: string): Promise<FlatTe
   try {
     const q = query(collectionGroup(db, 'flat_teams'), where('tournamentId', '==', tournamentId));
     const snap = await getDocs(q);
-    if (snap.empty) {
-      return [];
+    if (!snap.empty) {
+      return snap.docs.map(d => d.data() as FlatTeam);
     }
-    return snap.docs.map(d => d.data() as FlatTeam);
   } catch {
+    // collectionGroup failed or index missing
+  }
+
+  // AI-NOTE: Fallback — extract unique teams from fixtures collection
+  // This works even when flat_teams is empty (Teams/{tournamentId}/Group_X not populated)
+  const fixturesSnap = await getDocs(collection(db, `tournaments/${tournamentId}/fixtures`));
+  if (fixturesSnap.empty) {
     return [];
   }
+
+  const teamsMap = new Map<number, FlatTeam>();
+  fixturesSnap.forEach(doc => {
+    const data = doc.data() as TournamentFixture;
+    if (data.homeTeam && !teamsMap.has(data.homeTeam.apiId)) {
+      teamsMap.set(data.homeTeam.apiId, {
+        apiId: data.homeTeam.apiId,
+        name: data.homeTeam.name,
+        code: data.homeTeam.code || '',
+        logo: data.homeTeam.logo,
+        country: data.homeTeam.name,
+        group: '',
+        founded: null,
+        venue: { name: '', city: '', capacity: 0 },
+        isHost: false,
+        tournamentId,
+      });
+    }
+    if (data.awayTeam && !teamsMap.has(data.awayTeam.apiId)) {
+      teamsMap.set(data.awayTeam.apiId, {
+        apiId: data.awayTeam.apiId,
+        name: data.awayTeam.name,
+        code: data.awayTeam.code || '',
+        logo: data.awayTeam.logo,
+        country: data.awayTeam.name,
+        group: '',
+        founded: null,
+        venue: { name: '', city: '', capacity: 0 },
+        isHost: false,
+        tournamentId,
+      });
+    }
+  });
+
+  return Array.from(teamsMap.values());
 }
 
 export async function getOpponentsForTeam(
