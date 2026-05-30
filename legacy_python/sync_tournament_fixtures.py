@@ -23,8 +23,6 @@ TOURNAMENTS = {
 
 COLOMBIA_API_ID = 8
 
-GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
-
 
 def init_firebase():
     try:
@@ -147,7 +145,7 @@ def sync_fixtures(db, league_id, season):
                 "date": f["fixture"].get("date"),
                 "stadium": venue.get("name") or "Estadio por definir",
                 "venueCity": venue.get("city") or "Ciudad por definir",
-                "status": f["fixture"].get("status", "NS"),
+                "status": f["fixture"].get("status", {}).get("short", "NS") if isinstance(f["fixture"].get("status"), dict) else f["fixture"].get("status", "NS"),
                 "probHome": prob_home,
                 "probDraw": prob_draw,
                 "probAway": prob_away,
@@ -170,53 +168,51 @@ def sync_fixtures(db, league_id, season):
 
 
 def sync_flat_teams(db, tournament_id):
-    print(f"\n--- Sincronizando flat_teams desde Teams/{tournament_id}/ ---")
+    print(f"\n--- Sincronizando flat_teams desde tournaments/{tournament_id}/teams ---")
 
     saved_count = 0
     errors = []
 
-    for group in GROUPS:
-        group_ref = db.collection(f"Teams/{tournament_id}/Group_{group}")
+    teams_ref = db.collection(f"tournaments/{tournament_id}/teams")
+    try:
+        snap = teams_ref.get()
+    except Exception as e:
+        print(f"  Error leyendo tournaments/{tournament_id}/teams: {e}")
+        return 0, 1
+
+    if not snap:
+        print(f"  No se encontraron equipos en tournaments/{tournament_id}/teams")
+        return 0, 0
+
+    for team_doc in snap:
+        team_data = team_doc.to_dict()
+        api_id = team_data.get("apiId")
+        if not api_id:
+            continue
+
+        flat_data = {
+            "apiId": team_data.get("apiId"),
+            "name": team_data.get("name"),
+            "code": team_data.get("code"),
+            "logo": team_data.get("logo"),
+            "country": team_data.get("country"),
+            "group": team_data.get("group"),
+            "founded": team_data.get("founded"),
+            "venue": team_data.get("venue"),
+            "isHost": team_data.get("host", False),
+            "tournamentId": tournament_id,
+        }
+
         try:
-            snap = group_ref.get()
+            flat_path = f"tournaments/{tournament_id}/flat_teams/{api_id}"
+            db.document(flat_path).set(flat_data, merge=True)
+            saved_count += 1
         except Exception as e:
-            print(f"  Error leyendo Group_{group}: {e}")
-            continue
-
-        if not snap:
-            continue
-
-        for team_doc in snap:
-            team_data = team_doc.to_dict()
-            if "apiId" not in team_data:
-                continue
-
-            api_id = team_data["apiId"]
-            flat_data = {
-                "apiId": team_data.get("apiId"),
-                "name": team_data.get("name"),
-                "code": team_data.get("code"),
-                "logo": team_data.get("logo"),
-                "country": team_data.get("country"),
-                "group": team_data.get("group"),
-                "founded": team_data.get("founded"),
-                "venue": team_data.get("venue"),
-                "isHost": team_data.get("host", False),
-                "tournamentId": tournament_id,
-            }
-
-            try:
-                flat_path = f"tournaments/{tournament_id}/flat_teams/{api_id}"
-                db.document(flat_path).set(flat_data, merge=True)
-                saved_count += 1
-            except Exception as e:
-                errors.append(f"Error guardando flat_team {api_id}: {e}")
-
-        print(f"  Group {group}: {len(snap)} equipos procesados")
+            errors.append(f"Error guardando flat_team {api_id}: {e}")
 
     print(f"flat_teams guardados: {saved_count}")
     if errors:
-        for err in errors:
+        for err in errors[:5]:
             print(f"  {err}")
 
     return saved_count, len(errors)
